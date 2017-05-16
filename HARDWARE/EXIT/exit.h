@@ -7,6 +7,8 @@
 #include "includes.h"
 #endif
 
+extern OS_TCB KEYTask_TCB;
+
 void exit0_init(void);
 
 #endif

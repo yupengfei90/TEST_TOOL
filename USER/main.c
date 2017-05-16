@@ -6,8 +6,10 @@
 #include "key.h"
 #include "exit.h"
 #include "sram.h"
+#include "can.h"
 #include "malloc.h"
 #include "includes.h"
+
 //ALIENTEK 探索者STM32F407开发板 UCOSIII实验
 //例13-1 UCOSIII 同时等待多个内核对象
 
@@ -44,6 +46,13 @@ OS_TCB 	USART2RECTask_TCB;
 CPU_STK USART2RECTask_STK[USART2REC_STK_SIZE];
 void usart2rec_task(void *p_arg);
 
+//key down response
+#define KEY_TASK_PRIO 6
+#define KEY_STK_SIZE 128
+OS_TCB KEYTask_TCB;
+CPU_STK KEYTask_STK[LED3_STK_SIZE];
+void key_task(void *p_arg);
+
 //主函数
 int main(void)
 {
@@ -52,15 +61,14 @@ int main(void)
 
 	delay_init(168);  	//时钟初始化
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//中断分组配置
-//	uart_init(1382400);  //串口初始化
-	uart_init(2100000);
+	uart_init(115200);  //串口初始化
+	//uart_init(2100000);
 	LED_Init();         //LED初始化	
 	exit0_init();
 //	LCD_Init();			//LCD初始化	
-	KEY_Init();			//按键初始化
 //	FSMC_SRAM_Init();	//初始化SRAM
 	my_mem_init(SRAMIN);//初始化内部RAM
-	
+	CAN2_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率500Kbps 	
 
 	OSInit(&err);		    	//初始化UCOSIII
 	OS_CRITICAL_ENTER();	//进入临界区			 
@@ -121,6 +129,20 @@ void start_task(void *p_arg)
 					(OS_OPT         )OS_OPT_TASK_STK_CHK|OS_OPT_TASK_STK_CLR,
 					(OS_ERR        *)&err);
 					
+	//创建按键按下响应任务
+	OSTaskCreate (  (OS_TCB        *)&KEYTask_TCB,
+					(CPU_CHAR      *)"key task",
+					(OS_TASK_PTR    )key_task,
+					(void          *)0,
+					(OS_PRIO        )KEY_TASK_PRIO,
+					(CPU_STK       *)KEYTask_STK,
+					(CPU_STK_SIZE   )KEY_STK_SIZE/10,
+					(CPU_STK_SIZE   )KEY_STK_SIZE,
+					(OS_MSG_QTY     )0,
+					(OS_TICK        )0,
+					(void          *)0,
+					(OS_OPT         )OS_OPT_TASK_STK_CHK|OS_OPT_TASK_STK_CLR,
+					(OS_ERR        *)&err);
 					
 	OS_CRITICAL_EXIT();	//退出临界区	 
 	OSTaskDel((OS_TCB *)0, &err);
@@ -134,7 +156,7 @@ void led3_task(void *p_arg)
 	while(1)
 	{
 		LED3 = ~LED3;
-		printf("1234567\n");
+//		printf("1234567\n");
 		
 		OSTimeDlyHMSM(0,0,0,500,OS_OPT_TIME_HMSM_STRICT,&err);
 	}
@@ -161,6 +183,43 @@ void usart2rec_task(void *p_arg)
 	}
 }
 
+
+//用户按键按下响应任务处理任务
+void key_task(void *p_arg)
+{
+	OS_ERR err;
+	u8 i=0,res=0;
+	u8 cnt=0;
+	u8 canbuf[8];
+	
+	while(1){
+		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
+		printf("\r\n发送的数据为:\r\n");
+		for(i=0;i<8;i++)
+		{
+			canbuf[i]=cnt+i;//填充发送缓冲区
+			printf("%d ",canbuf[i]);
+ 		}
+		printf("\r\n");
+		
+		res=CAN2_Send_Msg(canbuf,8);//发送8个字节 
+		if(res)printf("发送失败r\n");		//提示发送失败
+		else printf("发送成功\r\n");	 		//提示发送成功	
+		
+		res=CAN2_Receive_Msg(canbuf);
+		if(res)//接收到有数据
+		{			
+ 			printf("接收到的数据为:\r\n");
+			for(i=0;i<res;i++)
+			{									    
+				printf("%d ", canbuf[i]);
+ 			}
+			printf("\r\n");
+		}
+		
+//		OSTimeDlyHMSM(0,0,0,500,OS_OPT_TIME_HMSM_STRICT,&err);
+	}
+}
 
 	
 
