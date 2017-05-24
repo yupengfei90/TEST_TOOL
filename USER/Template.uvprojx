@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_STDPERIPH_DRIVER,__FPU_USED=1</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\FWLIB\STM32F4xx_StdPeriph_Driver\inc;..\USER;..\MALLOC;..\HARDWARE\LED;..\HARDWARE\LCD;..\HARDWARE\KEY;..\HARDWARE\SRAM;..\HARDWARE\EXIT;..\HARDWARE\CAN;..\UCOSIII\uC-CPU;..\UCOSIII\uC-LIB;..\UCOSIII\uCOS-III;..\UCOSIII\UCOS_BSP;..\UCOSIII\uCOS_CONFIG;..\UCOSIII\uCOS-III\Source;..\UCOSIII\uC-CPU\ARM-Cortex-M4\RealView;..\UCOSIII\uC-LIB\Ports\ARM-Cortex-M4\RealView;..\UCOSIII\uCOS-III\Ports\ARM-Cortex-M4\Generic\RealView</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\FWLIB\STM32F4xx_StdPeriph_Driver\inc;..\USER;..\MALLOC;..\HARDWARE\LED;..\HARDWARE\LCD;..\HARDWARE\KEY;..\HARDWARE\SRAM;..\HARDWARE\EXIT;..\HARDWARE\CAN;..\HARDWARE\SPI;..\UCOSIII\uC-CPU;..\UCOSIII\uC-LIB;..\UCOSIII\uCOS-III;..\UCOSIII\UCOS_BSP;..\UCOSIII\uCOS_CONFIG;..\UCOSIII\uCOS-III\Source;..\UCOSIII\uC-CPU\ARM-Cortex-M4\RealView;..\UCOSIII\uC-LIB\Ports\ARM-Cortex-M4\RealView;..\UCOSIII\uCOS-III\Ports\ARM-Cortex-M4\Generic\RealView</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -458,6 +458,11 @@
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\CAN\can.c</FilePath>
             </File>
+            <File>
+              <FileName>spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\SPI\spi.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -527,6 +532,11 @@
               <FileName>stm32f4xx_can.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\FWLIB\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_can.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FWLIB\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_spi.c</FilePath>
             </File>
           </Files>
         </Group>

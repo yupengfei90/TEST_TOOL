@@ -7,6 +7,7 @@
 #include "exit.h"
 #include "sram.h"
 #include "can.h"
+#include "spi.h"
 #include "malloc.h"
 #include "includes.h"
 
@@ -24,6 +25,12 @@
 //淘宝店铺：http://eboard.taobao.com  
 //广州市星翼电子科技有限公司  
 //作者：正点原子 @ALIENTEK
+
+
+//协议部分
+u8 cmd[32] = {0};
+u8 cmd_head[] = {0xFF, 0xAA};
+u8 cmd_tail[] = {0xFF, 0x55};
 
 //Start task Prio
 #define START_TASK_PRIO 3
@@ -53,6 +60,13 @@ OS_TCB KEYTask_TCB;
 CPU_STK KEYTask_STK[LED3_STK_SIZE];
 void key_task(void *p_arg);
 
+//SPI2 test task
+#define SPI2_TASK_PRIO 7
+#define SPI2_STK_SIZE 128
+OS_TCB SPI2Task_TCB;
+CPU_STK SPI2Task_STK[SPI2_STK_SIZE];
+void spi2_task(void *p_arg);
+
 //主函数
 int main(void)
 {
@@ -62,14 +76,16 @@ int main(void)
 	delay_init(168);  	//时钟初始化
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//中断分组配置
 	uart_init(115200);  //串口初始化
-	//uart_init(2100000);
+//	uart_init(2100000);
 	LED_Init();         //LED初始化	
 	exit0_init();
 //	LCD_Init();			//LCD初始化	
 //	FSMC_SRAM_Init();	//初始化SRAM
 	my_mem_init(SRAMIN);//初始化内部RAM
 	CAN2_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率500Kbps 	
-
+	SPI2_Init();
+	SPI2_SetSpeed(SPI_BaudRatePrescaler_4); //高速模式(42/4)M SPI
+	
 	OSInit(&err);		    	//初始化UCOSIII
 	OS_CRITICAL_ENTER();	//进入临界区			 
 	//创建开始任务
@@ -144,6 +160,21 @@ void start_task(void *p_arg)
 					(OS_OPT         )OS_OPT_TASK_STK_CHK|OS_OPT_TASK_STK_CLR,
 					(OS_ERR        *)&err);
 					
+	//创建SPI2测试任务
+	OSTaskCreate (  (OS_TCB        *)&SPI2Task_TCB,
+					(CPU_CHAR      *)"spi2 task",
+					(OS_TASK_PTR    )spi2_task,
+					(void          *)0,
+					(OS_PRIO        )SPI2_TASK_PRIO,
+					(CPU_STK       *)SPI2Task_STK,
+					(CPU_STK_SIZE   )SPI2_STK_SIZE/10,
+					(CPU_STK_SIZE   )SPI2_STK_SIZE,
+					(OS_MSG_QTY     )0,
+					(OS_TICK        )0,
+					(void          *)0,
+					(OS_OPT         )OS_OPT_TASK_STK_CHK|OS_OPT_TASK_STK_CLR,
+					(OS_ERR        *)&err);
+					
 	OS_CRITICAL_EXIT();	//退出临界区	 
 	OSTaskDel((OS_TCB *)0, &err);
 }
@@ -156,6 +187,7 @@ void led3_task(void *p_arg)
 	while(1)
 	{
 		LED3 = ~LED3;
+
 //		printf("1234567\n");
 		
 		OSTimeDlyHMSM(0,0,0,500,OS_OPT_TIME_HMSM_STRICT,&err);
@@ -171,12 +203,18 @@ void usart2rec_task(void *p_arg)
 	
 	while(1){
 		if(USART_RX_STA & 0x8000){
-			printf("\r\n接收到的数据为: \r\n");
+			//printf("\r\n接收到的数据为: \r\n");
 			len = (USART_RX_STA & 0x3FF);
 			for(t=0;t<len;t++){
-				printf("%c",USART_RX_BUF[t]);
+				printf("%X ",USART_RX_BUF[t]);
 			}
-			printf("\n");
+			printf("\r\n");
+			
+			if (USART_RX_BUF[0] == cmd_head[0] && USART_RX_BUF[1] == cmd_head[1] &&  \
+				USART_RX_BUF[len-2] == cmd_tail[0] && USART_RX_BUF[len-1] == cmd_tail[1])
+			{
+				printf("正确的命令格式\r\n");
+			}
 			USART_RX_STA = 0;
 		}		
 		OSTimeDlyHMSM(0,0,0,500,OS_OPT_TIME_HMSM_STRICT,&err);
@@ -221,6 +259,18 @@ void key_task(void *p_arg)
 	}
 }
 
+//SPI2测试任务
+void spi2_task(void *p_arg)
+{
+	OS_ERR err;
 	
+	while(1){
+		
+		//SPI1_ReadWriteByte(0xaa);	//SPI2总线读写两个字节
+		SPI2_ReadWriteByte(0x55);
+		
+		OSTimeDlyHMSM(0,0,1,0,OS_OPT_TIME_HMSM_STRICT,&err);
+	}
+}
 
 
