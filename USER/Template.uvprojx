@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F40_41xxx,USE_STDPERIPH_DRIVER,__FPU_USED=1</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\FWLIB\STM32F4xx_StdPeriph_Driver\inc;..\USER;..\MALLOC;..\HARDWARE\LED;..\HARDWARE\LCD;..\HARDWARE\KEY;..\HARDWARE\SRAM;..\HARDWARE\EXIT;..\HARDWARE\CAN;..\HARDWARE\SPI;..\UCOSIII\uC-CPU;..\UCOSIII\uC-LIB;..\UCOSIII\uCOS-III;..\UCOSIII\UCOS_BSP;..\UCOSIII\uCOS_CONFIG;..\UCOSIII\uCOS-III\Source;..\UCOSIII\uC-CPU\ARM-Cortex-M4\RealView;..\UCOSIII\uC-LIB\Ports\ARM-Cortex-M4\RealView;..\UCOSIII\uCOS-III\Ports\ARM-Cortex-M4\Generic\RealView</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\FWLIB\STM32F4xx_StdPeriph_Driver\inc;..\USER;..\MALLOC;..\HARDWARE\LED;..\HARDWARE\LCD;..\HARDWARE\KEY;..\HARDWARE\SRAM;..\HARDWARE\EXIT;..\HARDWARE\CAN;..\HARDWARE\SPI;..\HARDWARE\74HC595;..\HARDWARE\AD7328;..\HARDWARE\DAC7565;..\UCOSIII\uC-CPU;..\UCOSIII\uC-LIB;..\UCOSIII\uCOS-III;..\UCOSIII\UCOS_BSP;..\UCOSIII\uCOS_CONFIG;..\UCOSIII\uCOS-III\Source;..\UCOSIII\uC-CPU\ARM-Cortex-M4\RealView;..\UCOSIII\uC-LIB\Ports\ARM-Cortex-M4\RealView;..\UCOSIII\uCOS-III\Ports\ARM-Cortex-M4\Generic\RealView</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -462,6 +462,21 @@
               <FileName>spi.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\SPI\spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>AD7328.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\AD7328\AD7328.c</FilePath>
+            </File>
+            <File>
+              <FileName>74hc595.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\74HC595\74hc595.c</FilePath>
+            </File>
+            <File>
+              <FileName>DAC7565.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\DAC7565\DAC7565.c</FilePath>
             </File>
           </Files>
         </Group>
