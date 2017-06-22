@@ -89,7 +89,7 @@ int main(void)
 	Init_74HC595();
 	DAC7565_Init();
 	SPI_Config();
-	SPI2_SetSpeed(SPI_BaudRatePrescaler_4); //高速模式(42/4)M SPI
+	SPI2_SetSpeed(SPI_BaudRatePrescaler_8); //高速模式(42/4)M SPI
 	
 //	while(1){
 //		if(KEY_User)
@@ -274,13 +274,14 @@ void key_task(void *p_arg)
 void spi2_task(void *p_arg)
 {
 	OS_ERR err;
-	
+	u8 i;
 	while(1){
 		
 		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
 		//SPI1_ReadWriteByte(0xaa);	//SPI2总线读写两个字节
-		SPI2_ReadWriteByte(0x55);
-		DAC7565_Output(1,2.0);
+		//SPI2_ReadWriteByte(0x55);
+		for(i=0;i<4;i++)
+			DAC7565_Output(i,2.0);	
 		
 		//OSTimeDlyHMSM(0,0,1,0,OS_OPT_TIME_HMSM_STRICT,&err);
 	}

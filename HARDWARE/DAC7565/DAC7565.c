@@ -30,10 +30,12 @@ void DAC7565_Init(void)
 	DAC7565_EN = 1;
 	DAC7565_SYNC = 1;
 	
-	//设定串行发送的格式
+	//设定串行发送的固定格式
 	DAC7565_Seq.bits.pd0 = 0;	//非节能模式 
-	DAC7565_Seq.bits.ld0 = 1; 	//设置为Single-channel update
-	DAC7565_Seq.bits.ld1 = 0;
+	DAC7565_Seq.bits.ld0 = 0; 	//设置为Single-channel update
+	DAC7565_Seq.bits.ld1 = 1;
+	
+	delay_us(1);
 }
 
 
@@ -41,8 +43,8 @@ void DAC7565_Output(u8 channel, double voltage)
 {
 	u16 ad;
 	//设置输出通道
-	DAC7565_Seq.data &= (~(0x11<<17));
-	DAC7565_Seq.data |= ((channel & 0x11)<<17);
+	DAC7565_Seq.data &= (~(0x3<<17));
+	DAC7565_Seq.data |= ((channel & 0x3)<<17);
 	//设置输出AD值
 	ad = (u16)((voltage/2.5)*4095);
 	DAC7565_Seq.data &= (~(0x0FFF<<4));
@@ -51,10 +53,12 @@ void DAC7565_Output(u8 channel, double voltage)
 	DAC7565_EN = 0;
 	delay_us(1);
 	DAC7565_SYNC = 0;
+	delay_us(1);
 	SPI2_ReadWriteByte((u8)(DAC7565_Seq.data >> 16));
 	SPI2_ReadWriteByte((u8)((DAC7565_Seq.data >> 8)&0xFF));
 	SPI2_ReadWriteByte((u8)(DAC7565_Seq.data&0xFF));
-	delay_us(1);
+	while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET){;}//等待发送区空 	
+	delay_us(40);	//故意加长的延时，因为SPI2波特率较低时会出现意外的SYNC上升沿早于数据传输完毕
 	DAC7565_SYNC = 1;
 	delay_us(1);
 	DAC7565_EN = 1;
