@@ -60,7 +60,7 @@ void SPI2_Init(void)
 	
 	SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;  //设置SPI单向或者双向的数据模式:SPI设置为双线双向全双工
 	SPI_InitStructure.SPI_Mode = SPI_Mode_Master;		//设置SPI工作模式:设置为主SPI
-	SPI_InitStructure.SPI_DataSize = SPI_DataSize_16b;		//设置SPI的数据大小:SPI发送接收8位帧结构
+	SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;		//设置SPI的数据大小:SPI发送接收8位帧结构
 	SPI_InitStructure.SPI_CPOL = SPI_CPOL_High;		//串行同步时钟的空闲状态为高电平
 	SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;	//串行同步时钟的第一个跳变沿（上升或下降）数据被采样
 	SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;		//NSS信号由硬件（NSS管脚）还是软件（使用SSI位）管理:内部NSS信号有SSI位控制
@@ -71,21 +71,11 @@ void SPI2_Init(void)
 	
 	SPI_Cmd(SPI2, ENABLE); //使能SPI外设
 	
-	SPI2_ReadWriteByte(0x55);//启动传输		 
+	SPI2_ReadWriteByte(0x55);//启动传输		
+	SPI2_ReadWriteByte(0xFF);//启动传输		 
 }
 
 
-//SPI2速度设置函数
-//SPI速度=fAPB1/分频系数
-//@ref SPI_BaudRate_Prescaler:SPI_BaudRatePrescaler_2~SPI_BaudRatePrescaler_256  
-//fAPB1时钟一般为42Mhz：
-void SPI2_SetSpeed(u8 SPI_BaudRatePrescaler)
-{
-  assert_param(IS_SPI_BAUDRATE_PRESCALER(SPI_BaudRatePrescaler));//判断有效性
-	SPI2->CR1&=0XFFC7;//位3-5清零，用来设置波特率
-	SPI2->CR1|=SPI_BaudRatePrescaler;	//设置SPI2速度 
-	SPI_Cmd(SPI2,ENABLE); //使能SPI1
-} 
 
 
 //SPI2 读写1个字节
@@ -124,6 +114,70 @@ u8 SPI2_ReadWriteByte(u8 TxData)
 //	}
 //}
 
+
+void SPI_GPIOConfig(void)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB,ENABLE);  //????
+    
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;  //?????
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_14 | GPIO_Pin_15;
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB,&GPIO_InitStructure);
+    
+    GPIO_PinAFConfig(GPIOB,GPIO_PinSource10,GPIO_AF_SPI2);  //?????????
+    GPIO_PinAFConfig(GPIOB,GPIO_PinSource14,GPIO_AF_SPI2);
+    GPIO_PinAFConfig(GPIOB,GPIO_PinSource15,GPIO_AF_SPI2);
+}
+
+
+void SPI_Config(void)
+{
+    SPI_InitTypeDef  SPI_InitStructure;
+	SPI_GPIOConfig();
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2,ENABLE);  //??
+    
+    SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;  //?????
+    SPI_InitStructure.SPI_Mode = SPI_Mode_Master;   //??????
+    SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;   //????8
+    SPI_InitStructure.SPI_CPOL  = SPI_CPOL_High;
+    SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
+    SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;   //????NSS??
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;
+    SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
+    SPI_InitStructure.SPI_CRCPolynomial = 7;
+    SPI_Init(SPI2,&SPI_InitStructure);
+    SPI_Cmd(SPI2,ENABLE);
+	MySPI_SendData(0xFF);
+}
+
+
+//SPI2速度设置函数
+//SPI速度=fAPB1/分频系数
+//@ref SPI_BaudRate_Prescaler:SPI_BaudRatePrescaler_2~SPI_BaudRatePrescaler_256  
+//fAPB1时钟一般为42Mhz：
+void SPI2_SetSpeed(u8 SPI_BaudRatePrescaler)
+{
+  assert_param(IS_SPI_BAUDRATE_PRESCALER(SPI_BaudRatePrescaler));//判断有效性
+	SPI2->CR1&=0XFFC7;//位3-5清零，用来设置波特率
+	SPI2->CR1|=SPI_BaudRatePrescaler;	//设置SPI2速度 
+	SPI_Cmd(SPI2,ENABLE); //使能SPI1
+} 
+
+
+void MySPI_SendData(char da)
+{
+    while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_TXE)==RESET);
+    SPI_SendData(SPI2,da);
+}
+
+uint8_t MySPI_ReceiveData(void)
+{
+    while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_RXNE)==RESET);
+    return SPI_ReceiveData(SPI2);
+}
 
 
 

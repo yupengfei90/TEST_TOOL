@@ -1,5 +1,11 @@
 #include "DAC7565.h"
 #include "spi.h"
+#include "delay.h"
+
+DAC7565_Seq_t DAC7565_Seq = {0};
+
+//DAC7565_Seq.bits.ld0 = 1;
+//DAC7565_Seq.bits.ld1 = 0;
 
 void DAC7565_Init(void)
 {
@@ -23,11 +29,34 @@ void DAC7565_Init(void)
 	DAC7565_RSTSEL = 0;		//输入解码为binary-straight	
 	DAC7565_EN = 1;
 	DAC7565_SYNC = 1;
+	
+	//设定串行发送的格式
+	DAC7565_Seq.bits.pd0 = 0;	//非节能模式 
+	DAC7565_Seq.bits.ld0 = 1; 	//设置为Single-channel update
+	DAC7565_Seq.bits.ld1 = 0;
 }
 
 
-void DAC7565_Output(u8 channel, float voltage)
+void DAC7565_Output(u8 channel, double voltage)
 {
-	DAC7565_EN = 0;
+	u16 ad;
+	//设置输出通道
+	DAC7565_Seq.data &= (~(0x11<<17));
+	DAC7565_Seq.data |= ((channel & 0x11)<<17);
+	//设置输出AD值
+	ad = (u16)((voltage/2.5)*4095);
+	DAC7565_Seq.data &= (~(0x0FFF<<4));
+	DAC7565_Seq.data |= (ad<<4);
 	
+	DAC7565_EN = 0;
+	delay_us(1);
+	DAC7565_SYNC = 0;
+	SPI2_ReadWriteByte((u8)(DAC7565_Seq.data >> 16));
+	SPI2_ReadWriteByte((u8)((DAC7565_Seq.data >> 8)&0xFF));
+	SPI2_ReadWriteByte((u8)(DAC7565_Seq.data&0xFF));
+	delay_us(1);
+	DAC7565_SYNC = 1;
+	delay_us(1);
+	DAC7565_EN = 1;
+	delay_us(1);
 }

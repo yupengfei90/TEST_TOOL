@@ -2,6 +2,7 @@
 #define _AD7328_H
 #include "sys.h"
 
+#define AD7328_CS PBout(0)
 #define CHANNEL0_3_SETRANGE0_10 0xBFE0	//通道0-3采样电压范围设为0-10V的串行命令
 #define CHANNEL4_7_SETRANGE0_10 0xDFE0	//通道4-7采样电压范围设为0-10V的串行命令
 #define READBYTE 0x55

@@ -16,6 +16,18 @@ static void control_register_set(void);
 *******************************************************************/
 void AD7328_Init(void)
 {
+	//AD片选引脚初始化
+	GPIO_InitTypeDef GPIO_InitStructure;
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB,ENABLE); //使能GPIOD的时钟
+	
+	//74HCT595的DS,SHCP,STCP,MR引脚都设置为输出引脚
+	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_0;
+	GPIO_InitStructure.GPIO_Mode=GPIO_Mode_OUT;//输出
+	GPIO_InitStructure.GPIO_OType=GPIO_OType_PP;  //推挽输出
+	GPIO_InitStructure.GPIO_PuPd=GPIO_PuPd_DOWN;  //下拉输出
+	GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz; //高速GPIO
+	GPIO_Init(GPIOB,&GPIO_InitStructure);
+	
 	control_register_set();
 	range_register_set();	//通道0-7,采样电压范围都设为0-10V
 }

@@ -3,6 +3,8 @@
 #include "delay.h"
 #include "led.h"
 
+extern OS_TCB SPI2Task_TCB;
+
 //中断处理函数
 void EXTI0_IRQHandler(void)
 {
@@ -15,7 +17,7 @@ void EXTI0_IRQHandler(void)
 		LED4 = !LED4;
 	}
 	OSTaskSemPost(&KEYTask_TCB,OS_OPT_POST_NONE,&err);
-	
+	OSTaskSemPost(&SPI2Task_TCB,OS_OPT_POST_NONE,&err);
 	EXTI_ClearITPendingBit(EXTI_Line0);
 	
 #if SYSTEM_SUPPORT_OS

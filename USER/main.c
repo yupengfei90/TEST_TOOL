@@ -8,10 +8,25 @@
 #include "sram.h"
 #include "can.h"
 #include "spi.h"
-#include "AD7328.h"
 #include "74hc595.h"
+#include "DAC7565.h"
 #include "malloc.h"
 #include "includes.h"
+
+//ALIENTEK 探索者STM32F407开发板 UCOSIII实验
+//例13-1 UCOSIII 同时等待多个内核对象
+
+//UCOSIII中以下优先级用户程序不能使用，ALIENTEK
+//将这些优先级分配给了UCOSIII的5个系统内部任务
+//优先级0：中断服务服务管理任务 OS_IntQTask()
+//优先级1：时钟节拍任务 OS_TickTask()
+//优先级2：定时任务 OS_TmrTask()
+//优先级OS_CFG_PRIO_MAX-2：统计任务 OS_StatTask()
+//优先级OS_CFG_PRIO_MAX-1：空闲任务 OS_IdleTask()
+//技术支持：www.openedv.com
+//淘宝店铺：http://eboard.taobao.com  
+//广州市星翼电子科技有限公司  
+//作者：正点原子 @ALIENTEK
 
 
 //协议部分
@@ -66,17 +81,22 @@ int main(void)
 //	uart_init(2100000);
 	LED_Init();         //LED初始化	
 	exit0_init();
+	KEY_Init();
 //	LCD_Init();			//LCD初始化	
 //	FSMC_SRAM_Init();	//初始化SRAM
 	my_mem_init(SRAMIN);//初始化内部RAM
 	CAN2_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率500Kbps 	
-	SPI2_Init();
-	SPI2_SetSpeed(SPI_BaudRatePrescaler_4); //高速模式(42/4)M SPI
-	AD7328_Init();
 	Init_74HC595();
-
-	SW_Open(0x55555555);
-	while(1);
+	DAC7565_Init();
+	SPI_Config();
+	SPI2_SetSpeed(SPI_BaudRatePrescaler_4); //高速模式(42/4)M SPI
+	
+//	while(1){
+//		if(KEY_User)
+//			MySPI_SendData(0x55);
+//			//SPI2_ReadWriteByte(0x55);	
+//	}
+	
 	OSInit(&err);		    	//初始化UCOSIII
 	OS_CRITICAL_ENTER();	//进入临界区			 
 	//创建开始任务
@@ -103,20 +123,6 @@ void start_task(void *p_arg)
 {
 	OS_ERR err;
 	CPU_SR_ALLOC();
-	
-	CPU_Init();
-#if OS_CFG_STAT_TASK_EN > 0u
-   OSStatTaskCPUUsageInit(&err);  	//统计任务                
-#endif
-	
-#ifdef CPU_CFG_INT_DIS_MEAS_EN		//如果使能了测量中断关闭时间
-    CPU_IntDisMeasMaxCurReset();	
-#endif
-	
-#if	OS_CFG_SCHED_ROUND_ROBIN_EN  //当使用时间片轮转的时候
-	 //使能时间片轮转调度功能,时间片长度为1个系统时钟节拍，既1*5=5ms
-	OSSchedRoundRobinCfg(DEF_ENABLED,1,&err);  
-#endif	
 	
 	OS_CRITICAL_ENTER();
 	//创建LED3任务
@@ -188,20 +194,14 @@ void start_task(void *p_arg)
 void led3_task(void *p_arg)
 {
 	OS_ERR err;
-//	u32 i;
 	
 	while(1)
 	{
 		LED3 = ~LED3;
-		
-		SW_Open(0x55555555);
-//		for(i=0;i<0xFFFFFF;i++)
-//			;
-//		printf("CpuUsage %u\n",OSStatTaskCPUUsage);
-//		printf("KEYTask_TCB CpuUsage %u\n",KEYTask_TCB.CPUUsage);
+
 //		printf("1234567\n");
 		
-		OSTimeDlyHMSM(0,0,0,100,OS_OPT_TIME_HMSM_STRICT,&err);
+		OSTimeDlyHMSM(0,0,0,500,OS_OPT_TIME_HMSM_STRICT,&err);
 	}
 }
 
@@ -277,10 +277,12 @@ void spi2_task(void *p_arg)
 	
 	while(1){
 		
+		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
 		//SPI1_ReadWriteByte(0xaa);	//SPI2总线读写两个字节
 		SPI2_ReadWriteByte(0x55);
+		DAC7565_Output(1,2.0);
 		
-		OSTimeDlyHMSM(0,0,1,0,OS_OPT_TIME_HMSM_STRICT,&err);
+		//OSTimeDlyHMSM(0,0,1,0,OS_OPT_TIME_HMSM_STRICT,&err);
 	}
 }
 
