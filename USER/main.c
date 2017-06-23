@@ -94,7 +94,7 @@ int main(void)
 //	while(1){
 //		if(KEY_User)
 //			MySPI_SendData(0x55);
-//			//SPI2_ReadWriteByte(0x55);	
+//			SPI2_ReadWriteByte(0x55);	
 //	}
 	
 	OSInit(&err);		    	//初始化UCOSIII
@@ -281,7 +281,7 @@ void spi2_task(void *p_arg)
 		//SPI1_ReadWriteByte(0xaa);	//SPI2总线读写两个字节
 		//SPI2_ReadWriteByte(0x55);
 		for(i=0;i<4;i++)
-			DAC7565_Output(i,2.0);	
+			DAC7565_Output(i,i+1);	
 		
 		//OSTimeDlyHMSM(0,0,1,0,OS_OPT_TIME_HMSM_STRICT,&err);
 	}
