@@ -156,7 +156,8 @@ void SPI2_SetSpeed(u8 SPI_BaudRatePrescaler)
 
 void MySPI_SendData(char da)
 {
-    while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_TXE)==RESET);
+    SPI2->DR;	//清除之前接收到的数据
+	while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_TXE)==RESET);
     SPI_SendData(SPI2,da);
 }
 

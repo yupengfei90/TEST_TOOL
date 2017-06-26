@@ -10,6 +10,8 @@
 #include "spi.h"
 #include "74hc595.h"
 #include "DAC7565.h"
+#include "AD7328.h"
+#include "HCF4051.h"
 #include "malloc.h"
 #include "includes.h"
 
@@ -88,14 +90,32 @@ int main(void)
 	CAN2_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率500Kbps 	
 	Init_74HC595();
 	DAC7565_Init();
+	AD7328_Init();
+
 	SPI_Config();
-	SPI2_SetSpeed(SPI_BaudRatePrescaler_8); //高速模式(42/4)M SPI
-	
-//	while(1){
-//		if(KEY_User)
-//			MySPI_SendData(0x55);
-//			SPI2_ReadWriteByte(0x55);	
-//	}
+	SPI2_SetSpeed(SPI_BaudRatePrescaler_16); //高速模式(42/4)M SPI
+	//AD7328_ChannelRead(0);
+	//delay_ms(2000);
+	HCF4051_Init();
+//	delay_ms(2000);
+	range_register_set();
+
+#if 0
+	while(1){
+		u16 ad;
+		if(KEY_User){
+//			AD7328_ChannelSelect(3);
+//			HCF4051_ChannelSelect(0);
+			
+			AD7328_Sample(Power_Vol_AD);
+//			delay_ms(10);
+//			AD7328_ChannelSelect(3);
+//			ad = AD7328_ReadAD();
+//			printf("ad = 0x%X\r\n",ad);
+			delay_ms(1000);
+		}
+	}
+#endif
 	
 	OSInit(&err);		    	//初始化UCOSIII
 	OS_CRITICAL_ENTER();	//进入临界区			 
@@ -280,8 +300,14 @@ void spi2_task(void *p_arg)
 		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
 		//SPI1_ReadWriteByte(0xaa);	//SPI2总线读写两个字节
 		//SPI2_ReadWriteByte(0x55);
-		for(i=0;i<4;i++)
-			DAC7565_Output(i,i+1);	
+//		for(i=0;i<4;i++)
+//			DAC7565_Output(i,i+1);	
+//		range_register_set();
+		
+//		SPI_ReadTest();
+//		AD7328_ChannelRead(0);
+		AD7328_Sample(KL15_Vol_AD);
+//		SPI2_ReadWriteByte(0x55);
 		
 		//OSTimeDlyHMSM(0,0,1,0,OS_OPT_TIME_HMSM_STRICT,&err);
 	}

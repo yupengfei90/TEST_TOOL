@@ -10,5 +10,7 @@ u8 SPI2_ReadWriteByte(u8 TxData);		//SPI2¶ÁÐ´Ò»¸ö×Ö½Ú
 
 void SPI_Config(void);
 void MySPI_SendData(char da);
+uint8_t MySPI_ReceiveData(void);
+
 #endif
 
