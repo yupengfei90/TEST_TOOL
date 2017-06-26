@@ -2,6 +2,9 @@
 #define _HCF4051_H
 #include "sys.h"
 
+/*=============================================
+	Macro
+ ==============================================*/
 #define HCF4051_A PDout(11)
 #define HCF4051_B PDout(12)
 #define HCF4051_C PDout(10)

@@ -1,120 +1,84 @@
 #include "spi.h"
 #include "usart.h"
-//////////////////////////////////////////////////////////////////////////////////	 
-//本程序只供学习使用，未经作者许可，不得用于其它任何用途
-//ALIENTEK STM32F407开发板
-//SPI 驱动代码	   
-//正点原子@ALIENTEK
-//技术论坛:www.openedv.com
-//创建日期:2014/5/6
-//版本：V1.0
-//版权所有，盗版必究。
-//Copyright(C) 广州市星翼电子科技有限公司 2014-2024
-//All rights reserved									  
-////////////////////////////////////////////////////////////////////////////////// 	 
+
 
 
 //以下是SPI模块的初始化代码，配置成主机模式 						  
 //SPI口初始化
 //这里针是对SPI2的初始化
-void SPI2_Init(void)
-{
-	GPIO_InitTypeDef  GPIO_InitStructure;
-	SPI_InitTypeDef  SPI_InitStructure;
-	
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);//使能GPIOB时钟
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);//使能GPIOE时钟
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);//使能SPI2时钟
-	
-	 
-	//AD7328和DAC7565片选引脚初始化为输出模式
-	//PB0初始化
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;//复用功能
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;//推挽输出
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;//100MHz
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;//上拉
-	GPIO_Init(GPIOB, &GPIO_InitStructure);//初始化	
-	//PE11初始化
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
-	GPIO_Init(GPIOE, &GPIO_InitStructure);//初始化	
-	//PB0,PB11初始输出都设为1	
-	GPIO_SetBits(GPIOB,GPIO_Pin_0);
-	GPIO_SetBits(GPIOE,GPIO_Pin_11);
-
-	//GPIOFB10,14,15初始化设置
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10|GPIO_Pin_14|GPIO_Pin_15;//PB10,14,15复用功能输出	
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;//复用功能
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;//推挽输出
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;//100MHz
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;//上拉
-	GPIO_Init(GPIOB, &GPIO_InitStructure);//初始化
-	
-	GPIO_PinAFConfig(GPIOB,GPIO_PinSource10,GPIO_AF_SPI2); //PB3复用为 SPI2
-	GPIO_PinAFConfig(GPIOB,GPIO_PinSource14,GPIO_AF_SPI2); //PB4复用为 SPI2
-	GPIO_PinAFConfig(GPIOB,GPIO_PinSource15,GPIO_AF_SPI2); //PB5复用为 SPI2
-	
-	//这里只针对SPI口初始化
-	RCC_APB1PeriphResetCmd(RCC_APB1Periph_SPI2,ENABLE);//复位SPI2
-	RCC_APB1PeriphResetCmd(RCC_APB1Periph_SPI2,DISABLE);//停止复位SPI2
-	
-	SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;  //设置SPI单向或者双向的数据模式:SPI设置为双线双向全双工
-	SPI_InitStructure.SPI_Mode = SPI_Mode_Master;		//设置SPI工作模式:设置为主SPI
-	SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;		//设置SPI的数据大小:SPI发送接收8位帧结构
-	SPI_InitStructure.SPI_CPOL = SPI_CPOL_High;		//串行同步时钟的空闲状态为高电平
-	SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;	//串行同步时钟的第一个跳变沿（上升或下降）数据被采样
-	SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;		//NSS信号由硬件（NSS管脚）还是软件（使用SSI位）管理:内部NSS信号有SSI位控制
-	SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;		//定义波特率预分频的值:波特率预分频值为256
-	SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;	//指定数据传输从MSB位还是LSB位开始:数据传输从MSB位开始
-	SPI_InitStructure.SPI_CRCPolynomial = 7;	//CRC值计算的多项式
-	SPI_Init(SPI2, &SPI_InitStructure);  //根据SPI_InitStruct中指定的参数初始化外设SPIx寄存器
-	
-	SPI_Cmd(SPI2, ENABLE); //使能SPI外设
-	
-	SPI2_ReadWriteByte(0x55);//启动传输		
-	SPI2_ReadWriteByte(0xFF);//启动传输		 
-}
-
-
-
-
-
-/******************************************************************
-功能：SPI控制芯片选择
-参数：chip,0表示选择芯片AD7328，1表示选择芯片DAC7565	
-备注：因为AD7328和DAC7565都连在了SPI2,所以两者互斥不能同时控制，须片选	
-*******************************************************************/
-//void ChipSelect(u8 chip)
+//void SPI2_Init(void)
 //{
-//	switch (chip){
-//		case 0:
-//			PBout(0) = 0;	
-//			PEout(11) = 1;
-//			break;
-//		case 1:
-//			PBout(0) = 1;
-//			PEout(11) = 0;
-//			break;
-//		default:
-//			printf("无效的片选\r\n");
-//			break;
-//	}
+//	GPIO_InitTypeDef  GPIO_InitStructure;
+//	SPI_InitTypeDef  SPI_InitStructure;
+//	
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);//使能GPIOB时钟
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);//使能GPIOE时钟
+//	RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);//使能SPI2时钟
+//	
+//	 
+//	//AD7328和DAC7565片选引脚初始化为输出模式
+//	//PB0初始化
+//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;//复用功能
+//	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;//推挽输出
+//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;//100MHz
+//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;//上拉
+//	GPIO_Init(GPIOB, &GPIO_InitStructure);//初始化	
+//	//PE11初始化
+//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+//	GPIO_Init(GPIOE, &GPIO_InitStructure);//初始化	
+//	//PB0,PB11初始输出都设为1	
+//	GPIO_SetBits(GPIOB,GPIO_Pin_0);
+//	GPIO_SetBits(GPIOE,GPIO_Pin_11);
+
+//	//GPIOFB10,14,15初始化设置
+//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10|GPIO_Pin_14|GPIO_Pin_15;//PB10,14,15复用功能输出	
+//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;//复用功能
+//	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;//推挽输出
+//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;//100MHz
+//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;//上拉
+//	GPIO_Init(GPIOB, &GPIO_InitStructure);//初始化
+//	
+//	GPIO_PinAFConfig(GPIOB,GPIO_PinSource10,GPIO_AF_SPI2); //PB3复用为 SPI2
+//	GPIO_PinAFConfig(GPIOB,GPIO_PinSource14,GPIO_AF_SPI2); //PB4复用为 SPI2
+//	GPIO_PinAFConfig(GPIOB,GPIO_PinSource15,GPIO_AF_SPI2); //PB5复用为 SPI2
+//	
+//	//这里只针对SPI口初始化
+//	RCC_APB1PeriphResetCmd(RCC_APB1Periph_SPI2,ENABLE);//复位SPI2
+//	RCC_APB1PeriphResetCmd(RCC_APB1Periph_SPI2,DISABLE);//停止复位SPI2
+//	
+//	SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;  //设置SPI单向或者双向的数据模式:SPI设置为双线双向全双工
+//	SPI_InitStructure.SPI_Mode = SPI_Mode_Master;		//设置SPI工作模式:设置为主SPI
+//	SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;		//设置SPI的数据大小:SPI发送接收8位帧结构
+//	SPI_InitStructure.SPI_CPOL = SPI_CPOL_High;		//串行同步时钟的空闲状态为高电平
+//	SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;	//串行同步时钟的第一个跳变沿（上升或下降）数据被采样
+//	SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;		//NSS信号由硬件（NSS管脚）还是软件（使用SSI位）管理:内部NSS信号有SSI位控制
+//	SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;		//定义波特率预分频的值:波特率预分频值为256
+//	SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;	//指定数据传输从MSB位还是LSB位开始:数据传输从MSB位开始
+//	SPI_InitStructure.SPI_CRCPolynomial = 7;	//CRC值计算的多项式
+//	SPI_Init(SPI2, &SPI_InitStructure);  //根据SPI_InitStruct中指定的参数初始化外设SPIx寄存器
+//	
+//	SPI_Cmd(SPI2, ENABLE); //使能SPI外设
+//	
+//	SPI2_ReadWriteByte(0x55);//启动传输		
+//	SPI2_ReadWriteByte(0xFF);//启动传输		 
 //}
+
 
 
 void SPI_GPIOConfig(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB,ENABLE);  //????
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB,ENABLE);  //使能GPIOB时钟
     
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;  //?????
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;  //配置为复用功能
     GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_14 | GPIO_Pin_15;
     GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOB,&GPIO_InitStructure);
     
-    GPIO_PinAFConfig(GPIOB,GPIO_PinSource10,GPIO_AF_SPI2);  //?????????
+    GPIO_PinAFConfig(GPIOB,GPIO_PinSource10,GPIO_AF_SPI2);  //复用为SPI2
     GPIO_PinAFConfig(GPIOB,GPIO_PinSource14,GPIO_AF_SPI2);
     GPIO_PinAFConfig(GPIOB,GPIO_PinSource15,GPIO_AF_SPI2);
 }
@@ -124,19 +88,19 @@ void SPI_Config(void)
 {
     SPI_InitTypeDef  SPI_InitStructure;
 	SPI_GPIOConfig();
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2,ENABLE);  //??
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2,ENABLE);  //打开SPI2时钟
     
-    SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;  //?????
-    SPI_InitStructure.SPI_Mode = SPI_Mode_Master;   //??????
-    SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;   //????8
+    SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;  
+    SPI_InitStructure.SPI_Mode = SPI_Mode_Master;   	//配置为主机模式
+    SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;   //8位帧结构
     SPI_InitStructure.SPI_CPOL  = SPI_CPOL_High;
     SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
-    SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;   //????NSS??
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;
+    SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;  
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;//预设波特率，可在SPI2_SetSpeed中更改
     SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
     SPI_InitStructure.SPI_CRCPolynomial = 7;
     SPI_Init(SPI2,&SPI_InitStructure);
-    SPI_Cmd(SPI2,ENABLE);
+    SPI_Cmd(SPI2,ENABLE);	//使能SPI2
 	MySPI_SendData(0xFF);
 }
 
@@ -157,7 +121,7 @@ void SPI2_SetSpeed(u8 SPI_BaudRatePrescaler)
 void MySPI_SendData(char da)
 {
     SPI2->DR;	//清除之前接收到的数据
-	while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_TXE)==RESET);
+	while(SPI_I2S_GetFlagStatus(SPI2,SPI_I2S_FLAG_TXE)==RESET){;}
     SPI_SendData(SPI2,da);
 }
 

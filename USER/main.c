@@ -12,6 +12,7 @@
 #include "DAC7565.h"
 #include "AD7328.h"
 #include "HCF4051.h"
+#include "power_sw.h"
 #include "malloc.h"
 #include "includes.h"
 
@@ -91,14 +92,16 @@ int main(void)
 	Init_74HC595();
 	DAC7565_Init();
 	AD7328_Init();
-
 	SPI_Config();
 	SPI2_SetSpeed(SPI_BaudRatePrescaler_16); //高速模式(42/4)M SPI
+	power_sw_init();
 	//AD7328_ChannelRead(0);
 	//delay_ms(2000);
 	HCF4051_Init();
+	KL30_EN = 1;
+	delay_ms(1000);
 //	delay_ms(2000);
-	range_register_set();
+	
 
 #if 0
 	while(1){
@@ -294,7 +297,7 @@ void key_task(void *p_arg)
 void spi2_task(void *p_arg)
 {
 	OS_ERR err;
-	u8 i;
+//	u8 i;
 	while(1){
 		
 		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
@@ -306,7 +309,11 @@ void spi2_task(void *p_arg)
 		
 //		SPI_ReadTest();
 //		AD7328_ChannelRead(0);
-		AD7328_Sample(KL15_Vol_AD);
+
+		
+		AD7328_Sample(Power_Vol_AD);
+
+//		DAC7565_Output(0,3.6);
 //		SPI2_ReadWriteByte(0x55);
 		
 		//OSTimeDlyHMSM(0,0,1,0,OS_OPT_TIME_HMSM_STRICT,&err);

@@ -122,10 +122,6 @@ typedef union{
 Externel function
 ******************************************************************/
 void AD7328_Init(void);
-u16 AD7328_ChannelRead(u8 channel);
-void range_register_set(void);
-
-void SPI_ReadTest();
 u16 AD7328_Sample(u16 select);
 
 void AD7328_ChannelSelect(u8 channel);
