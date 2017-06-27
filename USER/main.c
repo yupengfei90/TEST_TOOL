@@ -2,10 +2,8 @@
 #include "delay.h"
 #include "usart.h"
 #include "led.h"
-#include "lcd.h"
 #include "key.h"
 #include "exit.h"
-#include "sram.h"
 #include "can.h"
 #include "spi.h"
 #include "74hc595.h"
@@ -37,7 +35,7 @@ u8 cmd[32] = {0};
 u8 cmd_head[] = {0xFF, 0xAA};
 u8 cmd_tail[] = {0xFF, 0x55};
 
-//Start task Prio
+//Start task 
 #define START_TASK_PRIO 3
 #define START_STK_SIZE 128
 OS_TCB StartTask_TCB;
@@ -85,23 +83,17 @@ int main(void)
 	LED_Init();         //LED初始化	
 	exit0_init();
 	KEY_Init();
-//	LCD_Init();			//LCD初始化	
-//	FSMC_SRAM_Init();	//初始化SRAM
 	my_mem_init(SRAMIN);//初始化内部RAM
 	CAN2_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率500Kbps 	
 	Init_74HC595();
 	DAC7565_Init();
 	AD7328_Init();
-	SPI_Config();
-	SPI2_SetSpeed(SPI_BaudRatePrescaler_16); //高速模式(42/4)M SPI
+	SPI2_Init();
+	SPI2_SetSpeed(SPI_BaudRatePrescaler_4); //高速模式(42/4)M SPI
 	power_sw_init();
-	//AD7328_ChannelRead(0);
-	//delay_ms(2000);
 	HCF4051_Init();
-	KL30_EN = 1;
-	delay_ms(1000);
-//	delay_ms(2000);
-	
+	KL15_EN = 1;
+	delay_ms(100);		//延时等待各项初始值稳定
 
 #if 0
 	while(1){
@@ -309,9 +301,13 @@ void spi2_task(void *p_arg)
 		
 //		SPI_ReadTest();
 //		AD7328_ChannelRead(0);
-
 		
-		AD7328_Sample(Power_Vol_AD);
+		AD7328_Sample(SIG_Sensor_AD0);
+		
+		AD7328_Sample(SIG_Sensor_AD1);
+		AD7328_Sample(SIG_Sensor_AD2);
+		
+		printf("/r/n");
 
 //		DAC7565_Output(0,3.6);
 //		SPI2_ReadWriteByte(0x55);

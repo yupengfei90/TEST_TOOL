@@ -22,7 +22,7 @@ void Init_74HC595(void)
 	GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz; //高速GPIO
 	GPIO_Init(GPIOE,&GPIO_InitStructure);
 	
-	//GPIO_ResetBits(GPIOE, GPIO_Pin_12|GPIO_Pin_13|GPIO_Pin_14|GPIO_Pin_15);
+	GPIO_ResetBits(GPIOE, GPIO_Pin_12|GPIO_Pin_13|GPIO_Pin_15);	//DS,SHCP,STCP初始置0
 	MR = 0; 	//shift register清零
 	delay_us(1);
 	MR = 1;	
@@ -41,7 +41,7 @@ void SW_Open(u32 state)
 	SHCP = 0;
 	delay_us(1);
 	for(i=0;i<32;i++){
-		if(((state >> i) & 0x01))
+		if(((state >> i) & 0x01))	//低位先出
 			DS = 1;
 		else
 			DS = 0;

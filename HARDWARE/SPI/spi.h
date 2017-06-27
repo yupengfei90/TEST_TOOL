@@ -2,13 +2,14 @@
 #define __SPI_H
 #include "sys.h"
 
-//void SPI2_Init(void);					//初始化SPI2
-void SPI_Config(void);					//初始化SPI2
+/*===============================================================
+	Global Function
+  ===============================================================*/
+void SPI2_Init(void);					//初始化SPI2
 void SPI2_SetSpeed(u8 SpeedSet);	 	//设置SPI2速度   
-u8 SPI2_ReadWriteByte(u8 TxData);		//SPI2读写一个字节	
-
 void MySPI_SendData(char da);
-uint8_t MySPI_ReceiveData(void);
+u8 MySPI_ReceiveData(void);
+u8 SPI2_ReadWriteByte(u8 TxData);		//SPI2读写一个字节,慎用
 
 #endif
 

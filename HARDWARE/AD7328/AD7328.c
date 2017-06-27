@@ -28,8 +28,7 @@ void AD7328_Init(void)
 	GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz; //高速GPIO
 	GPIO_Init(GPIOB,&GPIO_InitStructure);
 	
-	AD7328_CS = 1;
-	
+	//将发往AD内部寄存器Control register的16位串行数据的某些位设为固定值
 	AD_ControlReg_Serial.bits.write = 1;
 	AD_ControlReg_Serial.bits.register_select1 = 0;	//选择AD7328内部的控制寄存器
 	AD_ControlReg_Serial.bits.register_select2 = 0;
@@ -42,42 +41,11 @@ void AD7328_Init(void)
 	AD_ControlReg_Serial.bits.seq1 = 0;				//不使用Channel Sequencer
 	AD_ControlReg_Serial.bits.seq2 = 0;
 	AD_ControlReg_Serial.bits.weak = 0;				//DOUT线传输完毕返回three-state状态(高阻状态)
+	
+	AD7328_CS = 1;
+	delay_us(1);
 }
 
-/******************************************************************
-功能：读取指定通道采取到的AD值
-参数：channel，要采样的通道(0-7)
-返回：返回模拟信号采集转换后的AD值
-*******************************************************************/
-//u16 AD7328_ChannelRead(u8 channel)
-//{
-//	u16 ConversionSerial = 0;
-//	u16 ConversionAD = 0;
-//	
-//	//设置通道
-//	AD_ControlReg_Serial.data |= ((channel & 0x7) << 10);	
-//	delay_us(1);
-//	AD7328_CS = 0;
-//	delay_us(1);
-//	SPI2_ReadWriteByte((u8)(AD_ControlReg_Serial.data >> 8));	//先传输高八位
-//	SPI2_ReadWriteByte((u8)(AD_ControlReg_Serial.data & 0xFF));	//传输低八位
-//	delay_us(55);
-//	AD7328_CS = 1;
-//	delay_us(1);
-//	
-//	//读取转换结果
-//	delay_us(1);
-//	AD7328_CS = 0;
-//	delay_us(1);
-//	ConversionSerial |= (SPI2_ReadWriteByte((u8)0x55) << 8);
-//	ConversionSerial |= SPI2_ReadWriteByte((u8)0x55);
-//	delay_us(55);
-//	ConversionAD = (ConversionSerial & 0xFFF);
-//	AD7328_CS = 1;
-//	delay_us(1);
-//	
-//	return ConversionAD;
-//}
 
 /*============================================================================
 	名称：AD7328_ChannelSelect
@@ -103,39 +71,32 @@ void AD7328_ChannelSelect(u8 channel)
 /*============================================================================
 	名称：AD7328_ReadAD
 	功能：读取前一配置下AD7328返回的16位串行数据
-	返回：从16位串行数据中提取的12位AD值
+	返回：从AD返回的16位串行数据，前三位表示通道，第4位表示符号，后12位为转化所得AD值
+	备注：因为采样电压范围设为-10-10V,所以采样电压如略低于GND，就会出现负的满量程显示,
+		  -10 - 0的AD我猜想是递增的，从0-FFF
+		  所以这里需要对返回的串行数据中的符号位进行判断，若符号位为0，则表示负电压
+		  该工装的没有负电压，所以若符号位为0，则数据位全部置0，回传最低电压0v
   ============================================================================*/
 u16 AD7328_ReadAD(void)
 {
 	u16 ConversionSerial = 0;
-	u16	ConversionAD = 0;
-	
-//	delay_us(1);
-//	AD7328_CS = 0;
-//	delay_us(1);
-//	MySPI_SendData(0x05);
-//	MySPI_SendData(0x05);
-//	//ConversionSerial |= (SPI2_ReadWriteByte(0x55)<<8);
-//	//ConversionSerial |= SPI2_ReadWriteByte(0x55);
-//	delay_us(55);
-//	AD7328_CS = 1;
-//	delay_us(1);
+	u16 bit_4;	//符号位，1代表正电压，0代表负电压
 	
 	delay_us(1);
 	AD7328_CS = 0;
 	delay_us(1);
 	MySPI_SendData(0x05);
-//	MySPI_SendData((u8)(AD_ControlReg_Serial.data >> 8));	//先传输高八位
 	ConversionSerial |= (MySPI_ReceiveData() << 8);
 	MySPI_SendData(0x05);
-//	MySPI_SendData((u8)(AD_ControlReg_Serial.data & 0xFF));	//传输低八位
 	ConversionSerial |= (MySPI_ReceiveData() & 0xFF);
-	//ConversionSerial |= (SPI2_ReadWriteByte(0x55)<<8);
-	//ConversionSerial |= SPI2_ReadWriteByte(0x55);
-	ConversionAD = (ConversionSerial & 0xFFF);
 	delay_us(55);
 	AD7328_CS = 1;
 	delay_us(1);
+	
+	//符号位判断，根据符号位对AD数据进行处理
+	bit_4 = (ConversionSerial & 0x1000);
+	if(!bit_4)
+		ConversionSerial &= 0xF000;
 	
 	return ConversionSerial;
 }
@@ -150,7 +111,7 @@ u16 AD7328_ReadAD(void)
   ============================================================================*/
 u16 AD7328_Sample(u16 select)
 {
-	u16 ad;
+	u16 adSeria,ad;
 	u8 AD7328_Channel, HCF4051_Channel;
 	
 	AD7328_Channel = (u8)(select >> 8);
@@ -158,83 +119,13 @@ u16 AD7328_Sample(u16 select)
 	HCF4051_ChannelSelect(HCF4051_Channel);
 	AD7328_ChannelSelect(AD7328_Channel);
 	
-	delay_ms(10);
-	ad = AD7328_ReadAD();
+	delay_ms(10);	//等待通道切换稳定和AD转化完成
+	adSeria = AD7328_ReadAD();
+	ad = adSeria&0xFFF;
 	
-	printf("adSerial = 0x%x，vol = %.2fv\r\n",ad,((ad&0xFFF)/4095.0)*10);
+	printf("adSerial = 0x%x，vol = %.2fv\r\n",adSeria,(ad/4095.0)*10);
 	
 	return ad;
 }
 /*****************************End of AD7328_Sample*****************************/
-
-
-
-/******************************************************************
-功能：设为8 Single-Ended模式，internal reference,
-	  不使用Channel Sequencer,以straight binary输出
-*******************************************************************/
-//static void control_register_set()
-//{
-
-//	
-//	delay_us(1);
-//	AD7328_CS = 0;
-//	delay_us(1);
-//	MySPI_SendData((u8)(AD_ControlReg_Serial.data >> 8));	//先传输高八位
-//	MySPI_SendData((u8)(AD_ControlReg_Serial.data & 0xFF));	//传输低八位
-//	delay_us(1);
-//	AD7328_CS = 1;
-//	delay_us(500);				//延时500us,等待internal reference电容缓冲稳定
-//}
-
-/******************************************************************
-名称：range_register_set
-功能：通道0-7采样范围均设为0-10V
-*******************************************************************/
-//void range_register_set(void)
-//{
-//	delay_us(1);
-//	AD7328_CS = 0;
-//	delay_us(1);
-//	MySPI_SendData((u8)(CHANNEL0_3_SETRANGE0_10 >> 8));	//通道0-3,采样电压范围设为0-10V
-//	MySPI_SendData((u8)(CHANNEL0_3_SETRANGE0_10 & 0xFF));
-//	delay_us(55);
-//	AD7328_CS = 1;
-//	delay_us(1);
-//	
-//	AD7328_CS = 0;
-//	delay_us(1);
-//	MySPI_SendData((u8)(CHANNEL4_7_SETRANGE0_10 >>8));	//通道4-7,采样电压范围设为0-10V
-//	MySPI_SendData((u8)(CHANNEL4_7_SETRANGE0_10 & 0xFF));
-//	delay_us(55);
-//	AD7328_CS = 1;
-//	delay_us(1);
-//}
-/*****************************End of range_register_set*****************************/
-
-
-
-//void SPI_ReadTest()
-//{
-//	u8 ad1,ad2;
-//	
-//	AD7328_CS = 0;
-//	delay_us(1);
-//	ad1 = SPI2_ReadWriteByte(0xaa);
-//	delay_us(1);
-//	AD7328_CS = 1;
-//	delay_us(1);
-//	
-//	AD7328_CS = 0;
-//	delay_us(1);
-//	ad2 = SPI2_ReadWriteByte(0xc0);
-//	delay_us(1);
-//	AD7328_CS = 1;
-//	delay_us(1);
-//	
-//	printf("ad1 = 0x%x\r\n",ad1);
-//	printf("ad2 = 0x%x\r\n",ad2);
-//}
-
-
 

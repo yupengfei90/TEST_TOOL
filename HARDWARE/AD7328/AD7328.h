@@ -23,11 +23,11 @@
 #define REQ_GATHER_AD5 0x0504
 
 //Andata1-是为原理图上的标号
-#define SIG_Trig_Hig_AD6 0x04001
-#define SIG_Trig_Hig_AD7 0x04002
-#define SIG_Trig_Hig_AD5 0x04000
-#define SIG_Trig_Hig_AD4 0x04003
-#define SIG_Trig_Hig_AD8 0x04005
+#define SIG_Trig_Hig_AD6 0x0401
+#define SIG_Trig_Hig_AD7 0x0402
+#define SIG_Trig_Hig_AD5 0x0400
+#define SIG_Trig_Hig_AD4 0x0403
+#define SIG_Trig_Hig_AD8 0x0405
 #define SIG_Sensor_AD8 0x0407
 #define SIG_Sensor_AD9 0x0406
 #define REQ_Gather_AD0 0x0404

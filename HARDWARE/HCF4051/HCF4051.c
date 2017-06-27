@@ -20,6 +20,8 @@ void HCF4051_Init(void)
 	GPIO_InitStructure.GPIO_PuPd=GPIO_PuPd_UP;  //上拉输出
 	GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz; //高速GPIO
 	GPIO_Init(GPIOD,&GPIO_InitStructure);
+	
+	GPIO_ResetBits(GPIOD,GPIO_Pin_10|GPIO_Pin_12|GPIO_Pin_11);	//初始为低，上电选中HCF4051第7通道
 }
 /*****************************End of HCF4051_Init*****************************/
 
