@@ -1,5 +1,6 @@
 #include "sys.h"
 #include "usart.h"	
+#include "timer.h"
 ////////////////////////////////////////////////////////////////////////////////// 	 
 //如果使用ucos,则包括下面的头文件即可.
 #if SYSTEM_SUPPORT_OS
@@ -61,10 +62,13 @@ int fputc(int ch, FILE *f)
 //串口1中断服务程序
 //注意,读取USARTx->SR能避免莫名其妙的错误   	
 u8 USART_RX_BUF[USART_REC_LEN];     //接收缓冲,最大USART_REC_LEN个字节.
-//接收状态
-//bit15，	接收完成标志
-//bit14，	接收到0x0d
-//bit13~0，	接收到的有效字节数目
+
+//通过判断接收连续2个字符之间的时间差不大于100ms来决定是不是一次连续的数据.
+//如果2个字符接收间隔超过10ms,则认为不是1次连续数据.也就是超过100ms没有接收到
+//任何数据,则表示此次接收完毕.
+//接收到的数据状态
+//[15]:0,没有接收到数据;1,接收到了一批数据.  状态
+//[14:0]:接收到的数据长度
 u16 USART_RX_STA=0;       //接收状态标记	
 
 //初始化IO 串口1 
@@ -111,9 +115,23 @@ void uart_init(u32 bound){
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority =3;		//子优先级3
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQ通道使能
 	NVIC_Init(&NVIC_InitStructure);	//根据指定的参数初始化VIC寄存器、
-
+			
+	TIM7_Int_Init(100-1,8400-1);	//10ms中断一次
+	TIM_Cmd(TIM7, DISABLE); //关闭定时器7
 #endif
 	
+}
+
+
+void MyUSART_SendData(USART_TypeDef* USARTx, uint16_t Data)
+{
+  /* Check the parameters */
+  assert_param(IS_USART_ALL_PERIPH(USARTx));
+  assert_param(IS_USART_DATA(Data)); 
+    
+  while((USARTx->SR&0X40)==0);//等待发送完毕
+	/* Transmit Data */
+  USARTx->DR = (Data & (uint16_t)0x01FF);
 }
 
 
@@ -129,21 +147,20 @@ void USART2_IRQHandler(void)                	//串口1中断服务程序
 		
 		if((USART_RX_STA&0x8000)==0)//接收未完成
 		{
-			if(USART_RX_STA&0x4000)//接收到了0x0d
+		//两种情况下  USART3_RX_STA 最高位置1,表示数据接收完毕
+		// 定时器的时间到
+		// 接收数据缓冲器满了
+			if(USART_RX_STA<USART_REC_LEN)		//还可以接收数据，
+			{									//判断USART_RX_STA,防止上次接收的数据未处理就被覆盖
+				
+				TIM_SetCounter(TIM7,0);//计数器清空   清空计数器不会产生中断     				 
+				if(USART_RX_STA==0)	//第一次接受到数据，需要把时钟打开	
+					TIM_Cmd(TIM7, ENABLE);  //使能定时器7 
+				USART_RX_BUF[USART_RX_STA++]=Res;		//记录接收到的值	 
+			}else 
 			{
-				if(Res!=0x0a)USART_RX_STA=0;//接收错误,重新开始
-				else USART_RX_STA|=0x8000;	//接收完成了 
-			}
-			else //还没收到0X0D
-			{	
-				if(Res==0x0d)USART_RX_STA|=0x4000;
-				else
-				{
-					USART_RX_BUF[USART_RX_STA&0X3FFF]=Res ;
-					USART_RX_STA++;
-					if(USART_RX_STA>(USART_REC_LEN-1))USART_RX_STA=0;//接收数据错误,重新开始接收	  
-				}		 
-			}
+				USART_RX_STA|=1<<15;					//强制标记接收完成
+			} 
 		}   		 
   } 
 #if SYSTEM_SUPPORT_OS 	//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.

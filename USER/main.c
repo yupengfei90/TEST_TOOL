@@ -30,10 +30,13 @@
 //作者：正点原子 @ALIENTEK
 
 
-//协议部分
-u8 cmd[32] = {0};
-u8 cmd_head[] = {0xFF, 0xAA};
-u8 cmd_tail[] = {0xFF, 0x55};
+//PC上位机与单片机通信的协议部分
+u8 t_frame[32] = {0};			//单片机可发送的最大帧长
+u8 t_head[] = {0xFF, 0xAA};		//单片机发往PC的帧头
+u8 t_tail[] = {0xFF, 0x55};		//单片机发往PC的帧尾
+u8 r_frame[32] = {0};			
+u8 r_head[] = {0xFF,0x55};		//PC发往下位机的固定帧头
+u8 r_tail[] = {0xFF,0xAA};		//PC发往下位机的固定帧尾
 
 //Start task 
 #define START_TASK_PRIO 3
@@ -86,6 +89,7 @@ int main(void)
 	my_mem_init(SRAMIN);//初始化内部RAM
 	CAN2_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率500Kbps 	
 	Init_74HC595();
+	SW_Open(0); 		//确保初始时74HC595控制的32个开关输出都为0
 	DAC7565_Init();
 	AD7328_Init();
 	SPI2_Init();
@@ -221,29 +225,103 @@ void led3_task(void *p_arg)
 }
 
 
+void SendWrongFrame(void)
+{
+	u8 i;
+	
+	t_frame[0] = t_head[0];
+	t_frame[1] = t_head[1];
+	t_frame[2] = 0x03;
+	t_frame[3] = 0xF0;
+	t_frame[4] = 0xFF;
+	t_frame[5] = t_tail[0];
+	t_frame[6] = t_tail[1];
+	for(i=0;i<7;++i)
+		MyUSART_SendData(USART2,t_frame[i]);
+}
 //USART2接收处理任务
 void usart2rec_task(void *p_arg)
 {
 	OS_ERR err;
-	u16 t, len;
-	
+	u16 checksum = 0; 	//校验和
+	u16 t_checksum; 	//命令帧中包含的校验和
+	u8 i;
+	u16 t,len;
+	u16 t_len; 		//PC发送的命令帧中的LEN字节
+	u8 type_h,type_l;
+	u16 type;
+	u8 select_h,select_l;
+	u16 select;
+	u8 status3,status2,status1,status0;		//status的四个字节
+	u32 status = 0;						//开关状态
 	while(1){
 		if(USART_RX_STA & 0x8000){
-			//printf("\r\n接收到的数据为: \r\n");
-			len = (USART_RX_STA & 0x3FF);
+			printf("\r\n接收到的数据为: \r\n");
+			len = (USART_RX_STA & 0x7FF);
 			for(t=0;t<len;t++){
 				printf("%X ",USART_RX_BUF[t]);
 			}
 			printf("\r\n");
 			
-			if (USART_RX_BUF[0] == cmd_head[0] && USART_RX_BUF[1] == cmd_head[1] &&  \
-				USART_RX_BUF[len-2] == cmd_tail[0] && USART_RX_BUF[len-1] == cmd_tail[1])
+			t_len = USART_RX_BUF[2];
+			
+			if (USART_RX_BUF[0] == r_head[0] && USART_RX_BUF[1] == r_head[1] &&  \
+				
+				USART_RX_BUF[2+t_len] == r_tail[0] && USART_RX_BUF[3+t_len] == r_tail[1])
 			{
 				printf("正确的命令格式\r\n");
+				for(i=2;i<t_len;++i)
+				{	
+					checksum += USART_RX_BUF[i];
+				}
+				t_checksum = (USART_RX_BUF[t_len] << 8) | USART_RX_BUF[t_len+1];
+				if(checksum != t_checksum){	
+					printf("校验和错误，请重发\r\n");
+					printf("checksum = %d,t_checksum = %d\r\n",checksum,t_checksum);
+					checksum = 0;
+				//	SendWrongFrame();
+				} 
+				else{
+					printf("校验和正确\r\n");	
+					checksum = 0;
+					type_h = USART_RX_BUF[3];
+					type_l = USART_RX_BUF[4];
+					type = (type_h << 8)| type_l; 
+					switch(type)
+					{
+						case 0xF001:
+							break;
+						case 0xF002:	//AD采样
+				
+							select_h = USART_RX_BUF[5];
+							select_l = USART_RX_BUF[6];
+							select = (select_h << 8) | select_l;
+							AD7328_Sample(select);
+					//		printf("Power_Vol_AD\r\n");
+							break;					
+						case 0xF003:
+							break;	
+						case 0xF004:	//开关模块
+							status3 = USART_RX_BUF[5];
+							status2 = USART_RX_BUF[6];
+							status1 = USART_RX_BUF[7];
+							status0 = USART_RX_BUF[8];
+							status =  status3<<24 | status2<<16 | status1<< 8 | status0;
+							SW_Open(status);	//根据status打开和关闭相应的开关
+							status = 0;
+							break;
+						case 0xF005:
+							break;
+						case 0xF006:
+							break;	
+						default:
+							break;
+					}
+				}
 			}
 			USART_RX_STA = 0;
 		}		
-		OSTimeDlyHMSM(0,0,0,500,OS_OPT_TIME_HMSM_STRICT,&err);
+		OSTimeDlyHMSM(0,0,0,10,OS_OPT_TIME_HMSM_STRICT,&err);
 	}
 }
 
@@ -303,11 +381,20 @@ void spi2_task(void *p_arg)
 //		AD7328_ChannelRead(0);
 		
 		AD7328_Sample(SIG_Sensor_AD0);
-		
+		printf(" SIG_Sensor_AD0\r\n");
 		AD7328_Sample(SIG_Sensor_AD1);
+		printf(" SIG_Sensor_AD1\r\n");
 		AD7328_Sample(SIG_Sensor_AD2);
-		
-		printf("/r/n");
+		printf(" SIG_Sensor_AD2\r\n");
+		AD7328_Sample(SIG_Sensor_AD3);
+		printf(" SIG_Sensor_AD3\r\n");
+		AD7328_Sample(SIG_Sensor_AD4);
+		printf(" SIG_Sensor_AD4\r\n");
+
+//		AD7328_Sample(SIG_Trig_Low_AD8);
+//		printf(" SIG_Trig_Low_AD8\r\n");
+
+		printf("\r\n");
 
 //		DAC7565_Output(0,3.6);
 //		SPI2_ReadWriteByte(0x55);

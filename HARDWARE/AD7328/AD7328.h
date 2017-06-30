@@ -53,8 +53,8 @@
 #define Motor_Step_Cur_AD 0x0604
 
 //Andata4-是为原理图上的标号
-#define Sig_Trig_Hig_AD2 0x0301
-#define Sig_Trig_Hig_AD1 0x0302
+#define SIG_Trig_Hig_AD2 0x0301
+#define SIG_Trig_Hig_AD1 0x0302
 #define Power_Vol_AD	0x0300
 #define KL30_Vol_AD	0x0303
 #define SIG_Trig_Hig_AD3 0x0305
