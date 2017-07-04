@@ -15,8 +15,8 @@ void EXTI0_IRQHandler(void)
 	delay_ms(10); //延迟10ms,消抖
 	if(KEY_User == 1){
 		//LED4 = ~LED4;	//LED4的PD12管脚被HCF4051占用，不应再使用，以免引起冲突
-		//	OSTaskSemPost(&KEYTask_TCB,OS_OPT_POST_NONE,&err);
-		OSTaskSemPost(&SPI2Task_TCB,OS_OPT_POST_NONE,&err);
+		OSTaskSemPost(&KEYTask_TCB,OS_OPT_POST_NONE,&err);
+//		OSTaskSemPost(&SPI2Task_TCB,OS_OPT_POST_NONE,&err);
 	}
 
 	EXTI_ClearITPendingBit(EXTI_Line0);

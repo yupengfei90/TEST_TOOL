@@ -11,9 +11,10 @@ void power_sw_init(void)
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
 	
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE,ENABLE); //使能GPIOE的时钟
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE,ENABLE); //使能GPIOD的时钟
 	
-	//KL15_EN,KL30_EN引脚都设置为输出引脚
+	//KL15_EN,KL30_EN,SW_POWER引脚都设置为输出引脚
 	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_7|GPIO_Pin_8;
 	GPIO_InitStructure.GPIO_Mode=GPIO_Mode_OUT;//输出
 	GPIO_InitStructure.GPIO_OType=GPIO_OType_PP;  //推挽输出
@@ -21,6 +22,10 @@ void power_sw_init(void)
 	GPIO_InitStructure.GPIO_Speed=GPIO_Speed_100MHz; //高速GPIO
 	GPIO_Init(GPIOE,&GPIO_InitStructure);
 	
+	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_6;
+	GPIO_Init(GPIOD,&GPIO_InitStructure);
+	
 	GPIO_ResetBits(GPIOE,GPIO_Pin_7|GPIO_Pin_8);	//初始状态为0，关闭
+	GPIO_ResetBits(GPIOD,GPIO_Pin_6);	
 }
 /*****************************End of power_sw_init*****************************/

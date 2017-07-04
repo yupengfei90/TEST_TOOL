@@ -123,7 +123,7 @@ u16 AD7328_Sample(u16 select)
 	adSeria = AD7328_ReadAD();
 	ad = adSeria&0xFFF;
 	
-	printf("adSerial = 0x%x£¬vol = %.2fv\r\n ",adSeria,(ad/4095.0)*10);
+//	printf("adSerial = 0x%x£¬vol = %.2fv\r\n ",adSeria,(ad/4095.0)*10);
 	
 	return ad;
 }

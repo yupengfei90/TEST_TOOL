@@ -87,7 +87,7 @@ int main(void)
 	exit0_init();
 	KEY_Init();
 	my_mem_init(SRAMIN);//初始化内部RAM
-	CAN2_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率500Kbps 	
+	CAN2_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_Normal);//CAN初始化环回模式,波特率500Kbps 	
 	Init_74HC595();
 	SW_Open(0); 		//确保初始时74HC595控制的32个开关输出都为0
 	DAC7565_Init();
@@ -239,50 +239,61 @@ void SendWrongFrame(void)
 	for(i=0;i<7;++i)
 		MyUSART_SendData(USART2,t_frame[i]);
 }
+void SendFrame(void)
+{
+	u8 i;
+	
+	for(i=0;i<32;i++){
+		printf("%x ",t_frame[i]);
+	}
+}
 //USART2接收处理任务
 void usart2rec_task(void *p_arg)
 {
 	OS_ERR err;
 	u16 checksum = 0; 	//校验和
-	u16 t_checksum; 	//命令帧中包含的校验和
+	u16 r_checksum = 0; 	//命令帧中包含的校验和
+	u16 t_checksum = 0;
 	u8 i;
-	u16 t,len;
-	u16 t_len; 		//PC发送的命令帧中的LEN字节
+//	u16 t,len;
+//	u16 t_len; 		//单片机发往PC上位机的命令帧长度
+	u16 r_len;		//从上位机接收到的命令帧的长度
 	u8 type_h,type_l;
 	u16 type;
 	u8 select_h,select_l;
 	u16 select;
 	u8 status3,status2,status1,status0;		//status的四个字节
 	u32 status = 0;						//开关状态
+	u16 ad;
 	while(1){
 		if(USART_RX_STA & 0x8000){
-			printf("\r\n接收到的数据为: \r\n");
-			len = (USART_RX_STA & 0x7FF);
-			for(t=0;t<len;t++){
-				printf("%X ",USART_RX_BUF[t]);
-			}
-			printf("\r\n");
+//			printf("\r\n接收到的数据为: \r\n");
+//			len = (USART_RX_STA & 0x7FF);
+//			for(t=0;t<len;t++){
+//				printf("%X ",USART_RX_BUF[t]);
+//			}
+//			printf("\r\n");
 			
-			t_len = USART_RX_BUF[2];
+			r_len = USART_RX_BUF[2];
 			
 			if (USART_RX_BUF[0] == r_head[0] && USART_RX_BUF[1] == r_head[1] &&  \
 				
-				USART_RX_BUF[2+t_len] == r_tail[0] && USART_RX_BUF[3+t_len] == r_tail[1])
+				USART_RX_BUF[2+r_len] == r_tail[0] && USART_RX_BUF[3+r_len] == r_tail[1])
 			{
-				printf("正确的命令格式\r\n");
-				for(i=2;i<t_len;++i)
+//				printf("正确的命令格式\r\n");
+				for(i=2;i<r_len;++i)
 				{	
 					checksum += USART_RX_BUF[i];
 				}
-				t_checksum = (USART_RX_BUF[t_len] << 8) | USART_RX_BUF[t_len+1];
-				if(checksum != t_checksum){	
+				r_checksum = (USART_RX_BUF[r_len] << 8) | USART_RX_BUF[r_len+1];
+				if(checksum != r_checksum){	
 					printf("校验和错误，请重发\r\n");
-					printf("checksum = %d,t_checksum = %d\r\n",checksum,t_checksum);
+					printf("checksum = %d,r_checksum = %d\r\n",checksum,r_checksum);
 					checksum = 0;
-				//	SendWrongFrame();
+					SendWrongFrame();					
 				} 
 				else{
-					printf("校验和正确\r\n");	
+//					printf("校验和正确\r\n");	
 					checksum = 0;
 					type_h = USART_RX_BUF[3];
 					type_l = USART_RX_BUF[4];
@@ -296,7 +307,33 @@ void usart2rec_task(void *p_arg)
 							select_h = USART_RX_BUF[5];
 							select_l = USART_RX_BUF[6];
 							select = (select_h << 8) | select_l;
-							AD7328_Sample(select);
+							ad = AD7328_Sample(select);
+							
+						//开始按照格式回传数据
+
+							t_frame[0] = t_head[0];
+							t_frame[1] = t_head[1];
+							t_frame[2] = 0x09;
+							t_frame[3] = 0xF0;
+							t_frame[4] = 0x02;
+							t_frame[5] = select_h;
+							t_frame[6] = select_l;
+							t_frame[7] = (u8)(ad>>8);	//ad值高四位
+							t_frame[8] = (u8)(ad&0xFF);
+							t_checksum = 0;		//程序处于while循环中，t_checksum不会自动清零，
+												//须吧上次的累加和清零
+							for(i=2;i<9;++i)
+							{	
+								t_checksum += t_frame[i];
+							}
+							t_frame[9] = (u8)(t_checksum >> 8);
+							t_frame[10] = (u8)(t_checksum & 0xFF);	
+							t_frame[11] = t_tail[0];
+							t_frame[12] = t_tail[1];
+//							for(i=0;i<=10;i++){
+//								printf("%x ",t_frame[i]);
+//							}
+							SendFrame();
 					//		printf("Power_Vol_AD\r\n");
 							break;					
 						case 0xF003:
@@ -313,15 +350,30 @@ void usart2rec_task(void *p_arg)
 						case 0xF005:
 							break;
 						case 0xF006:
+							t_frame[0] = t_head[0];
+							t_frame[1] = t_head[1];
+							t_frame[2] = 0x07;
+							t_frame[3] = 0xF0;
+							t_frame[4] = 0x06;
+							t_frame[5] = 0xC4;
+							t_frame[6] = 0x0D;
+							t_frame[7] = 0x01;
+							t_frame[8] = 0xCE;
+							t_frame[9] = t_tail[0];
+							t_frame[10] = t_tail[1];
+							SendFrame();
 							break;	
-						default:
+						case 0xF0FE:
+							SendFrame();
 							break;
+						default:
+							break; 
 					}
 				}
 			}
 			USART_RX_STA = 0;
 		}		
-		OSTimeDlyHMSM(0,0,0,10,OS_OPT_TIME_HMSM_STRICT,&err);
+		OSTimeDlyHMSM(0,0,0,100,OS_OPT_TIME_HMSM_STRICT,&err);
 	}
 }
 
