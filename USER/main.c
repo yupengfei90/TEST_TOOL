@@ -87,7 +87,7 @@ int main(void)
 	exit0_init();
 	KEY_Init();
 	my_mem_init(SRAMIN);//初始化内部RAM
-	CAN2_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_Normal);//CAN初始化环回模式,波特率500Kbps 	
+	CAN1_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率500Kbps    
 	Init_74HC595();
 	SW_Open(0); 		//确保初始时74HC595控制的32个开关输出都为0
 	DAC7565_Init();
@@ -396,11 +396,11 @@ void key_task(void *p_arg)
  		}
 		printf("\r\n");
 		
-		res=CAN2_Send_Msg(canbuf,8);//发送8个字节 
+		res=CAN1_Send_Msg(canbuf,8);//发送8个字节 
 		if(res)printf("发送失败r\n");		//提示发送失败
 		else printf("发送成功\r\n");	 		//提示发送成功	
 		
-		res=CAN2_Receive_Msg(canbuf);
+		res=CAN1_Receive_Msg(canbuf);
 		if(res)//接收到有数据
 		{			
  			printf("接收到的数据为:\r\n");
