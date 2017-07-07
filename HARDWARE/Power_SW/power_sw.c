@@ -29,3 +29,44 @@ void power_sw_init(void)
 	GPIO_ResetBits(GPIOD,GPIO_Pin_6);	
 }
 /*****************************End of power_sw_init*****************************/
+
+
+/*============================================================================
+	名称：power_manager
+	参数：sel，0:2位分别对应KL15,KL30,SW_POWER的选中与否，1代表选中，0代表未选中
+		  state，与sel相对应，1代表ON，2代表OFF
+	功能：控制开关KL15,KL30,SW_POWER的ON与OFF
+  ============================================================================*/
+void power_manager(u8 sel, u8 state)
+{
+	u8 kl15,kl30,powerSW;
+	u8 kl15_st,kl30_st,powerSW_st;
+	
+	kl15 = sel & 0x01;
+	kl30 = sel & 0x02;
+	powerSW = sel & 0x04;
+	
+	kl15_st = state & 0x01;
+	kl30_st = state & 0x02;
+	powerSW_st = state & 0x04;
+	
+	if(kl15){
+		if(kl15_st)
+			KL15_EN = 1;	
+		else
+			KL15_EN = 0;
+	}
+	if(kl30){
+		if(kl30_st)
+			KL30_EN = 1;
+		else
+			KL30_EN = 0;
+	}
+	if(powerSW){
+		if(powerSW_st)
+			SW_POWER = 1;
+		else	
+			SW_POWER = 0;
+	}
+}
+/*****************************End of power_manager*****************************/

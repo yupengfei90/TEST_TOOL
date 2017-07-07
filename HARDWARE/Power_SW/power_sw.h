@@ -13,4 +13,5 @@
 	Global function
 ******************************************************************/
 void power_sw_init(void);
+void power_manager(u8 sel, u8 state);
 #endif

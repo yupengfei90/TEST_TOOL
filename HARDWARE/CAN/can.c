@@ -116,22 +116,22 @@ void CAN1_RX0_IRQHandler(void)
 //msg:数据指针,最大为8个字节.
 //返回值:0,成功;
 //		 其他,失败;
-u8 CAN1_Send_Msg(u8* msg,u8 len)
+u8 CAN1_Send_Msg(u8* msg,u8 len,u16 id)
 {	
   u8 mbox;
   u16 i=0;
   CanTxMsg TxMessage;
-  TxMessage.StdId=0x12;	 // 标准标识符为0
-  TxMessage.ExtId=0x12;	 // 设置扩展标示符（29位）
-  TxMessage.IDE=0;		  // 使用扩展标识符
-  TxMessage.RTR=0;		  // 消息类型为数据帧，一帧8位
-  TxMessage.DLC=len;							 // 发送两帧信息
+  TxMessage.StdId=id;	 			// 标准标识符
+  TxMessage.ExtId=0x12;	 			// 设置扩展标示符
+  TxMessage.IDE=CAN_Id_Standard; 	// 标准帧
+  TxMessage.RTR=CAN_RTR_DATA;	 	// 数据帧
+  TxMessage.DLC=len;				// 发送的帧长
   for(i=0;i<len;i++)
-  TxMessage.Data[i]=msg[i];				 // 第一帧信息          
+  TxMessage.Data[i]=msg[i];			      
   mbox= CAN_Transmit(CAN1, &TxMessage);   
   i=0;
   while((CAN_TransmitStatus(CAN1, mbox)==CAN_TxStatus_Failed)&&(i<0XFFF))i++;	//等待发送结束
-  if(i>=0XFFF)return 1;
+  if(i>=0XFFF)return 1;				//时间限制
   return 0;		
 
 }

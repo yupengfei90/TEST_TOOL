@@ -96,8 +96,7 @@ int main(void)
 	SPI2_SetSpeed(SPI_BaudRatePrescaler_4); //高速模式(42/4)M SPI
 	power_sw_init();
 	HCF4051_Init();
-	KL15_EN = 1;
-	delay_ms(100);		//延时等待各项初始值稳定
+//	delay_ms(100);		//延时等待各项初始值稳定
 
 #if 0
 	while(1){
@@ -243,10 +242,12 @@ void SendFrame(void)
 {
 	u8 i;
 	
-	for(i=0;i<32;i++){
-		printf("%x ",t_frame[i]);
+	for(i=0;i<t_frame[2]+4;i++){
+		MyUSART_SendData(USART2,t_frame[i]);
 	}
 }
+
+
 //USART2接收处理任务
 void usart2rec_task(void *p_arg)
 {
@@ -255,7 +256,7 @@ void usart2rec_task(void *p_arg)
 	u16 r_checksum = 0; 	//命令帧中包含的校验和
 	u16 t_checksum = 0;
 	u8 i;
-//	u16 t,len;
+	u16 t,len;
 //	u16 t_len; 		//单片机发往PC上位机的命令帧长度
 	u16 r_len;		//从上位机接收到的命令帧的长度
 	u8 type_h,type_l;
@@ -264,48 +265,71 @@ void usart2rec_task(void *p_arg)
 	u16 select;
 	u8 status3,status2,status1,status0;		//status的四个字节
 	u32 status = 0;						//开关状态
-	u16 ad;
+	u16 ad;								//AD
+	u8 DA_Channel,DA_Vol;				//DA
+	u8 power_sel, power_state;			//电源管理模块
+	u16 CANSendID;						//CAN发送报文命令变量
+	u8 CANSendDLC,CANErrCycle;
+	u8 ret;
+	u8 CANSendBuff[8] = {0};
+//	u8 CANRecvID,CANRecvDLC;			//CAN获取报文命令变量
 	while(1){
 		if(USART_RX_STA & 0x8000){
 //			printf("\r\n接收到的数据为: \r\n");
-//			len = (USART_RX_STA & 0x7FF);
+			len = (USART_RX_STA & 0x7FF);
 //			for(t=0;t<len;t++){
 //				printf("%X ",USART_RX_BUF[t]);
 //			}
 //			printf("\r\n");
 			
-			r_len = USART_RX_BUF[2];
+			for(t=0;t<len;t++){
+				r_frame[t] = USART_RX_BUF[t];
+			}
 			
-			if (USART_RX_BUF[0] == r_head[0] && USART_RX_BUF[1] == r_head[1] &&  \
+			r_len = r_frame[2];
+			
+			if (r_frame[0] == r_head[0] && r_frame[1] == r_head[1] &&  \
 				
-				USART_RX_BUF[2+r_len] == r_tail[0] && USART_RX_BUF[3+r_len] == r_tail[1])
+				r_frame[2+r_len] == r_tail[0] && r_frame[3+r_len] == r_tail[1])
 			{
 //				printf("正确的命令格式\r\n");
 				for(i=2;i<r_len;++i)
 				{	
-					checksum += USART_RX_BUF[i];
+					checksum += r_frame[i];
 				}
-				r_checksum = (USART_RX_BUF[r_len] << 8) | USART_RX_BUF[r_len+1];
+				r_checksum = (r_frame[r_len] << 8) | r_frame[r_len+1];
 				if(checksum != r_checksum){	
-					printf("校验和错误，请重发\r\n");
-					printf("checksum = %d,r_checksum = %d\r\n",checksum,r_checksum);
+//					printf("校验和错误，请重发\r\n");
+//					printf("checksum = %d,r_checksum = %d\r\n",checksum,r_checksum);
 					checksum = 0;
 					SendWrongFrame();					
 				} 
 				else{
 //					printf("校验和正确\r\n");	
 					checksum = 0;
-					type_h = USART_RX_BUF[3];
-					type_l = USART_RX_BUF[4];
+					type_h = r_frame[3];
+					type_l = r_frame[4];
 					type = (type_h << 8)| type_l; 
 					switch(type)
 					{
-						case 0xF001:
+						case 0xF001:	//CAN发送命令
+							CANSendID = r_frame[5] << 8 | r_frame[6];
+							CANSendDLC = r_frame[7];
+							CANErrCycle = r_frame[8];
+							for(i = 0; i < CANSendDLC; ++i){
+								CANSendBuff[i] = r_frame[9+i];
+							}
+							ret = CAN1_Send_Msg(CANSendBuff,CANSendDLC,CANSendID); //ret非0表示有错
+							if(CANErrCycle){	//定义了错误重发，出错时则不断重发
+								while(ret){
+									ret = CAN1_Send_Msg(CANSendBuff,CANSendDLC,CANSendID);
+								}	
+							}
 							break;
 						case 0xF002:	//AD采样
-				
-							select_h = USART_RX_BUF[5];
-							select_l = USART_RX_BUF[6];
+						//命令响应
+							select_h = r_frame[5];
+							select_l = r_frame[6];
 							select = (select_h << 8) | select_l;
 							ad = AD7328_Sample(select);
 							
@@ -330,26 +354,38 @@ void usart2rec_task(void *p_arg)
 							t_frame[10] = (u8)(t_checksum & 0xFF);	
 							t_frame[11] = t_tail[0];
 							t_frame[12] = t_tail[1];
-//							for(i=0;i<=10;i++){
-//								printf("%x ",t_frame[i]);
-//							}
+							
 							SendFrame();
-					//		printf("Power_Vol_AD\r\n");
 							break;					
-						case 0xF003:
+						case 0xF003:		//DA输出
+							DA_Channel = r_frame[5];
+							DA_Vol = r_frame[6] / 10.0;
+							DAC7565_Output(DA_Channel,DA_Vol);
 							break;	
-						case 0xF004:	//开关模块
-							status3 = USART_RX_BUF[5];
-							status2 = USART_RX_BUF[6];
-							status1 = USART_RX_BUF[7];
-							status0 = USART_RX_BUF[8];
+						case 0xF004:		//开关模块
+							//命令响应
+							status3 = r_frame[5];
+							status2 = r_frame[6];
+							status1 = r_frame[7];
+							status0 = r_frame[8];
 							status =  status3<<24 | status2<<16 | status1<< 8 | status0;
 							SW_Open(status);	//根据status打开和关闭相应的开关
 							status = 0;
+							//回传数据
+						
 							break;
-						case 0xF005:
+						case 0xF005:		//电源管理模块
+							//命令响应
+							power_sel = r_frame[5];
+							power_state = r_frame[6];
+							power_manager(power_sel,power_state);
+							//回传数据
+						
 							break;
-						case 0xF006:
+						case 0xF006:		//下位机版本查询命令
+							//命令响应
+						
+							//回传数据
 							t_frame[0] = t_head[0];
 							t_frame[1] = t_head[1];
 							t_frame[2] = 0x07;
@@ -363,7 +399,7 @@ void usart2rec_task(void *p_arg)
 							t_frame[10] = t_tail[1];
 							SendFrame();
 							break;	
-						case 0xF0FE:
+						case 0xF0FE:		//要求下位机重传命令
 							SendFrame();
 							break;
 						default:
@@ -396,9 +432,9 @@ void key_task(void *p_arg)
  		}
 		printf("\r\n");
 		
-		res=CAN1_Send_Msg(canbuf,8);//发送8个字节 
+		res=CAN1_Send_Msg(canbuf,8,0x12);//发送8个字节 
 		if(res)printf("发送失败r\n");		//提示发送失败
-		else printf("发送成功\r\n");	 		//提示发送成功	
+		else printf("发送成功\r\n");	 	//提示发送成功	
 		
 		res=CAN1_Receive_Msg(canbuf);
 		if(res)//接收到有数据
