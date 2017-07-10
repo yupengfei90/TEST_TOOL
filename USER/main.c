@@ -81,13 +81,13 @@ int main(void)
 
 	delay_init(168);  	//时钟初始化
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//中断分组配置
-	uart_init(115200);  //串口初始化
-//	uart_init(2100000);
+//	uart_init(115200);  //串口初始化
+	uart_init(1382400);
 	LED_Init();         //LED初始化	
 	exit0_init();
 	KEY_Init();
 	my_mem_init(SRAMIN);//初始化内部RAM
-	CAN1_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_LoopBack);//CAN初始化环回模式,波特率500Kbps    
+	CAN1_Mode_Init(CAN_SJW_1tq,CAN_BS2_6tq,CAN_BS1_7tq,6,CAN_Mode_Normal);//CAN初始化环回模式,波特率500Kbps    
 	Init_74HC595();
 	SW_Open(0); 		//确保初始时74HC595控制的32个开关输出都为0
 	DAC7565_Init();
@@ -212,13 +212,12 @@ void start_task(void *p_arg)
 void led3_task(void *p_arg)
 {
 	OS_ERR err;
-	
 	while(1)
 	{
 		LED3 = ~LED3;
 
 //		printf("1234567\n");
-		
+
 		OSTimeDlyHMSM(0,0,0,500,OS_OPT_TIME_HMSM_STRICT,&err);
 	}
 }
@@ -230,12 +229,14 @@ void SendWrongFrame(void)
 	
 	t_frame[0] = t_head[0];
 	t_frame[1] = t_head[1];
-	t_frame[2] = 0x03;
+	t_frame[2] = 0x05;
 	t_frame[3] = 0xF0;
 	t_frame[4] = 0xFF;
-	t_frame[5] = t_tail[0];
-	t_frame[6] = t_tail[1];
-	for(i=0;i<7;++i)
+	t_frame[5] = 0x01;
+	t_frame[6] = 0xF4;
+	t_frame[7] = t_tail[0];
+	t_frame[8] = t_tail[1];
+	for(i=0;i<9;++i)
 		MyUSART_SendData(USART2,t_frame[i]);
 }
 void SendFrame(void)
@@ -272,7 +273,9 @@ void usart2rec_task(void *p_arg)
 	u8 CANSendDLC,CANErrCycle;
 	u8 ret;
 	u8 CANSendBuff[8] = {0};
-//	u8 CANRecvID,CANRecvDLC;			//CAN获取报文命令变量
+	u16 CANRecvID;						//CAN获取报文命令变量
+	u8 CANRecvDLC;		
+	u8 CANRecvBuff[8] = {0};
 	while(1){
 		if(USART_RX_STA & 0x8000){
 //			printf("\r\n接收到的数据为: \r\n");
@@ -293,6 +296,7 @@ void usart2rec_task(void *p_arg)
 				r_frame[2+r_len] == r_tail[0] && r_frame[3+r_len] == r_tail[1])
 			{
 //				printf("正确的命令格式\r\n");
+				checksum = 0;
 				for(i=2;i<r_len;++i)
 				{	
 					checksum += r_frame[i];
@@ -306,7 +310,6 @@ void usart2rec_task(void *p_arg)
 				} 
 				else{
 //					printf("校验和正确\r\n");	
-					checksum = 0;
 					type_h = r_frame[3];
 					type_l = r_frame[4];
 					type = (type_h << 8)| type_l; 
@@ -326,6 +329,38 @@ void usart2rec_task(void *p_arg)
 								}	
 							}
 							break;
+						case 0xF007:	//CAN报文获取命令
+							//命令响应
+							CANRecvID = r_frame[5] << 8 | r_frame[6];	
+							CANRecvDLC = RxMessage.DLC;
+							while(!(RxMessage.StdId == CANRecvID));	//没有获取到想要的ID则一直等待
+							for(i=0;i<CANRecvDLC;i++){
+								CANRecvBuff[i] = RxMessage.Data[i];
+							}
+							
+							//回传数据
+							t_frame[0] = t_head[0];
+							t_frame[1] = t_head[1];
+							t_frame[2] = CANRecvDLC + 8;
+							t_frame[3] = 0xF0;
+							t_frame[4] = 0x07;
+							t_frame[5] = CANRecvID >> 8;
+							t_frame[6] = CANRecvID & 0xFF;
+							t_frame[7] = CANRecvDLC;
+							for(i=0;i<CANRecvDLC;++i){
+								t_frame[8+i] = CANRecvBuff[i];
+							}
+							t_checksum = 0;
+							for(i=2;i<CANRecvDLC+8;++i){
+								t_checksum += t_frame[i];
+							}
+							t_frame[8+CANRecvDLC] = t_checksum >> 8;
+							t_frame[9+CANRecvDLC] = t_checksum & 0xFF;
+							t_frame[10+CANRecvDLC] = t_tail[0];
+							t_frame[11+CANRecvDLC] =t_tail[1];
+
+							SendFrame();
+							break;
 						case 0xF002:	//AD采样
 						//命令响应
 							select_h = r_frame[5];
@@ -334,7 +369,6 @@ void usart2rec_task(void *p_arg)
 							ad = AD7328_Sample(select);
 							
 						//开始按照格式回传数据
-
 							t_frame[0] = t_head[0];
 							t_frame[1] = t_head[1];
 							t_frame[2] = 0x09;
@@ -409,7 +443,7 @@ void usart2rec_task(void *p_arg)
 			}
 			USART_RX_STA = 0;
 		}		
-		OSTimeDlyHMSM(0,0,0,100,OS_OPT_TIME_HMSM_STRICT,&err);
+		OSTimeDlyHMSM(0,0,0,10,OS_OPT_TIME_HMSM_STRICT,&err);
 	}
 }
 
@@ -417,38 +451,40 @@ void usart2rec_task(void *p_arg)
 //用户按键按下响应任务处理任务
 void key_task(void *p_arg)
 {
+#if 0
 	OS_ERR err;
 	u8 i=0,res=0;
 	u8 cnt=0;
 	u8 canbuf[8];
-	
+	u16 id;
 	while(1){
 		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
-		printf("\r\n发送的数据为:\r\n");
-		for(i=0;i<8;i++)
-		{
-			canbuf[i]=cnt+i;//填充发送缓冲区
-			printf("%d ",canbuf[i]);
- 		}
-		printf("\r\n");
-		
-		res=CAN1_Send_Msg(canbuf,8,0x12);//发送8个字节 
-		if(res)printf("发送失败r\n");		//提示发送失败
-		else printf("发送成功\r\n");	 	//提示发送成功	
-		
-		res=CAN1_Receive_Msg(canbuf);
-		if(res)//接收到有数据
+	
+//		printf("\r\n发送的数据为:\r\n");
+//		for(i=0;i<8;i++)
+//		{
+//			canbuf[i]=cnt+i;//填充发送缓冲区
+//			printf("%d ",canbuf[i]);
+// 		}
+//		printf("\r\n");
+//		res=CAN1_Send_Msg(canbuf,8,0x12);//发送8个字节 
+//		if(res)printf("发送失败r\n");		//提示发送失败
+//		else printf("发送成功\r\n");	 	//提示发送成功	
+//		
+	
+		id = RxMessage.StdId;
+
+		if(id == 0x513)//接收到有数据
 		{			
  			printf("接收到的数据为:\r\n");
-			for(i=0;i<res;i++)
+			for(i=0;i<8;i++)
 			{									    
-				printf("%d ", canbuf[i]);
+				printf("%d ", RxMessage.Data[i]);
  			}
 			printf("\r\n");
 		}
-		
-//		OSTimeDlyHMSM(0,0,0,500,OS_OPT_TIME_HMSM_STRICT,&err);
 	}
+#endif
 }
 
 //SPI2测试任务

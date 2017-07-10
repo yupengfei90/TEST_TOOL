@@ -1,7 +1,17 @@
+#define _CAN_C
 #include "can.h"
 #include "led.h"
 #include "delay.h"
 #include "usart.h"
+#if SYSTEM_SUPPORT_OS
+#include "includes.h"					//ucos 使用	  
+#endif
+
+/*==========================================================================
+		Global Variable
+  ==========================================================================*/
+CanRxMsg RxMessage;
+
 //////////////////////////////////////////////////////////////////////////////////	 
 //本程序只供学习使用，未经作者许可，不得用于其它任何用途
 //ALIENTEK STM32F407开发板
@@ -26,8 +36,6 @@
 //则波特率为:42M/((6+7+1)*6)=500Kbps
 //返回值:0,初始化OK;
 //    其他,初始化失败; 
-
-
 u8 CAN1_Mode_Init(u8 tsjw,u8 tbs2,u8 tbs1,u16 brp,u8 mode)
 {
 
@@ -99,15 +107,21 @@ u8 CAN1_Mode_Init(u8 tsjw,u8 tbs2,u8 tbs1,u16 brp,u8 mode)
 	return 0;
 }   
  
+
 #if CAN1_RX0_INT_ENABLE	//使能RX0中断
 //中断服务函数			    
 void CAN1_RX0_IRQHandler(void)
 {
-  	CanRxMsg RxMessage;
-	int i=0;
+//	int i=0;
+#if SYSTEM_SUPPORT_OS 		//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
+	OSIntEnter();    
+#endif
     CAN_Receive(CAN1, 0, &RxMessage);
-	for(i=0;i<8;i++)
-	printf("rxbuf[%d]:%d\r\n",i,RxMessage.Data[i]);
+//	for(i=0;i<8;i++)
+//	printf("rxbuf[%d]:%d\r\n",i,RxMessage.Data[i]);
+#if SYSTEM_SUPPORT_OS 	//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
+	OSIntExit();  											 
+#endif
 }
 #endif
 
@@ -135,19 +149,30 @@ u8 CAN1_Send_Msg(u8* msg,u8 len,u16 id)
   return 0;		
 
 }
-//can口接收数据查询
-//buf:数据缓存区;	 
-//返回值:0,无数据被收到;
-//		 其他,接收的数据长度;
-u8 CAN1_Receive_Msg(u8 *buf)
+
+
+/************************************************************************************
+函数名：CAN1_Receive_Msg
+功能：获取制定ID的报文数据
+参数：id,需要获取的报文的ID；data,存放获取到的报文数据的数组
+返回值：当获取到指定ID的报文时，返回该报文的数据长度DLC,如不是想要的ID,返回0
+*************************************************************************************/
+u8 CAN1_Receive_Msg(u16 id, u8 *data)
 {		   		   
  	u32 i;
 	CanRxMsg RxMessage;
-    if( CAN_MessagePending(CAN1,CAN_FIFO0)==0)return 0;		//没有接收到数据,直接退出 
+	i = CAN_MessagePending(CAN1,CAN_FIFO0);
+    if( i==0)return 0;		//没有接收到数据,直接退出 
     CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);//读取数据	
-    for(i=0;i<RxMessage.DLC;i++)
-    buf[i]=RxMessage.Data[i];  
-	return RxMessage.DLC;	
+	i = CAN_MessagePending(CAN1,CAN_FIFO0);
+	if(RxMessage.StdId == id){
+		for(i=0;i<RxMessage.DLC;i++)
+		data[i]=RxMessage.Data[i]; 
+		return RxMessage.DLC;	
+	}
+	else{
+		return 0;
+	}
 }
 
 
