@@ -52,14 +52,12 @@ _sys_exit(int x)
 //重定义fputc函数 
 int fputc(int ch, FILE *f)
 { 	
-	while((USART2->SR&0X40)==0);//循环发送,直到发送完毕   
-	USART2->DR = (u8) ch;      
+	while((TEAM_PORT->SR&0X40)==0);//循环发送,直到发送完毕   
+	TEAM_PORT->DR = (u8) ch;      
 	return ch;
 }
 #endif
  
-#if EN_USART2_RX_IT   //如果使能了接收中断
-//串口1中断服务程序
 //注意,读取USARTx->SR能避免莫名其妙的错误   	
 u8 USART_RX_BUF[USART_REC_LEN];     //接收缓冲,最大USART_REC_LEN个字节.
 
@@ -78,17 +76,23 @@ void uart_init(u32 bound){
 	GPIO_InitTypeDef GPIO_InitStructure;
 	USART_InitTypeDef USART_InitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
-	
+
+if (TEAM_PORT == USART2){ 
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE); //使能GPIOA时钟
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);//使能USART1时钟
- 
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);//使能USART2时钟
+} else if(TEAM_PORT == USART3) {
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD,ENABLE); //使能GPIOD时钟
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3,ENABLE);//使能USART3时钟	
+}
+	
+if (TEAM_PORT == USART2){ 
 	//串口1对应引脚复用映射
 	GPIO_PinAFConfig(GPIOA,GPIO_PinSource2,GPIO_AF_USART2); //GPIOA2复用为USART2
 	GPIO_PinAFConfig(GPIOA,GPIO_PinSource3,GPIO_AF_USART2); //GPIOA3复用为USART2
 	
-	//USART1端口配置
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3; //GPIOA9与GPIOA10
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;//复用功能
+	//USART2端口配置
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3; 
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	//速度50MHz
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP; //推挽复用输出
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP; //上拉
@@ -102,11 +106,35 @@ void uart_init(u32 bound){
 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//收发模式
 	USART_Init(USART2, &USART_InitStructure); //初始化串口1
 	
-	USART_Cmd(USART2, ENABLE);  //使能串口1 
-	
+	USART_Cmd(USART2, ENABLE);  //使能串口2
 	//USART_ClearFlag(USART1, USART_FLAG_TC);
+} else if(TEAM_PORT == USART3) { 
+		//串口1对应引脚复用映射
+	GPIO_PinAFConfig(GPIOD,GPIO_PinSource8,GPIO_AF_USART3); //GPIOD8复用为USART3
+	GPIO_PinAFConfig(GPIOD,GPIO_PinSource9,GPIO_AF_USART3); //GPIOD9复用为USART3
 	
-#if EN_USART2_RX_IT
+	//USART3端口配置
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9; 
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP; 
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOD,&GPIO_InitStructure); //初始化PD8，PD9
+
+	USART_InitStructure.USART_BaudRate = bound;//波特率设置
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;//字长为8位数据格式
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;//一个停止位
+	USART_InitStructure.USART_Parity = USART_Parity_No;//无奇偶校验位
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//无硬件数据流控制
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//收发模式
+	USART_Init(USART3, &USART_InitStructure); //初始化串口3
+	
+	USART_Cmd(USART3, ENABLE);  //使能串口3
+}	
+	
+	
+#if EN_USARTx_RX_IT
+if (TEAM_PORT == USART2){ 
 	USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);//开启相关中断
 
 	//Usart1 NVIC 配置
@@ -115,7 +143,16 @@ void uart_init(u32 bound){
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority =3;		//子优先级3
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQ通道使能
 	NVIC_Init(&NVIC_InitStructure);	//根据指定的参数初始化VIC寄存器、
-			
+} else if (TEAM_PORT == USART3)	{
+	USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);//开启相关中断
+
+	//Usart1 NVIC 配置
+  NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;//串口1中断通道
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=3;//抢占优先级3
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority =3;		//子优先级3
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQ通道使能
+	NVIC_Init(&NVIC_InitStructure);	//根据指定的参数初始化VIC寄存器、
+}	 	
 	TIM7_Int_Init(100-1,8400-1);	//10ms中断一次
 	TIM_Cmd(TIM7, DISABLE); //关闭定时器7
 #endif
@@ -135,15 +172,15 @@ void MyUSART_SendData(USART_TypeDef* USARTx, uint16_t Data)
 }
 
 
-void USART2_IRQHandler(void)                	//串口1中断服务程序
+void USART2_IRQHandler(void)                	//串口2中断服务程序
 {
 	u8 Res;
 #if SYSTEM_SUPPORT_OS 		//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
 	OSIntEnter();    
 #endif
-	if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)  //接收中断(接收到的数据必须是0x0d 0x0a结尾)
+	if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)  //接收中断
 	{
-		Res =USART_ReceiveData(USART2);//(USART1->DR);	//读取接收到的数据
+		Res =USART_ReceiveData(USART2);
 		
 		if((USART_RX_STA&0x8000)==0)//接收未完成
 		{
@@ -167,7 +204,39 @@ void USART2_IRQHandler(void)                	//串口1中断服务程序
 	OSIntExit();  											 
 #endif
 } 
-#endif	
+
+void USART3_IRQHandler(void)                	//串口3中断服务程序
+{
+	u8 Res;
+#if SYSTEM_SUPPORT_OS 		//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
+	OSIntEnter();    
+#endif
+	if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)  //接收中断(接收到的数据必须是0x0d 0x0a结尾)
+	{
+		Res =USART_ReceiveData(USART3);//(USART1->DR);	//读取接收到的数据
+		
+		if((USART_RX_STA&0x8000)==0)//接收未完成
+		{
+		//两种情况下  USART3_RX_STA 最高位置1,表示数据接收完毕
+		// 定时器的时间到
+		// 接收数据缓冲器满了
+			if(USART_RX_STA<USART_REC_LEN)		//还可以接收数据，
+			{									//判断USART_RX_STA,防止上次接收的数据未处理就被覆盖
+				
+				TIM_SetCounter(TIM7,0);//计数器清空   清空计数器不会产生中断     				 
+				if(USART_RX_STA==0)	//第一次接受到数据，需要把时钟打开	
+					TIM_Cmd(TIM7, ENABLE);  //使能定时器7 
+				USART_RX_BUF[USART_RX_STA++]=Res;		//记录接收到的值	 
+			}else 
+			{
+				USART_RX_STA|=1<<15;					//强制标记接收完成
+			} 
+		}   		 
+  } 
+#if SYSTEM_SUPPORT_OS 	//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
+	OSIntExit();  											 
+#endif
+} 
 
  
 

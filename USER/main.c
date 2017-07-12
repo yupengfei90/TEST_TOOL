@@ -237,14 +237,14 @@ void SendWrongFrame(void)
 	t_frame[7] = t_tail[0];
 	t_frame[8] = t_tail[1];
 	for(i=0;i<9;++i)
-		MyUSART_SendData(USART2,t_frame[i]);
+		MyUSART_SendData(TEAM_PORT,t_frame[i]);
 }
 void SendFrame(void)
 {
 	u8 i;
 	
 	for(i=0;i<t_frame[2]+4;i++){
-		MyUSART_SendData(USART2,t_frame[i]);
+		MyUSART_SendData(TEAM_PORT,t_frame[i]);
 	}
 }
 
@@ -256,6 +256,7 @@ void usart2rec_task(void *p_arg)
 	u16 checksum = 0; 	//校验和
 	u16 r_checksum = 0; 	//命令帧中包含的校验和
 	u16 t_checksum = 0;
+//	u32 OverTimeCnt = 0;	
 	u8 i;
 	u16 t,len;
 //	u16 t_len; 		//单片机发往PC上位机的命令帧长度
@@ -316,6 +317,7 @@ void usart2rec_task(void *p_arg)
 					switch(type)
 					{
 						case 0xF001:	//CAN发送命令
+							//命令响应
 							CANSendID = r_frame[5] << 8 | r_frame[6];
 							CANSendDLC = r_frame[7];
 							CANErrCycle = r_frame[8];
@@ -328,6 +330,8 @@ void usart2rec_task(void *p_arg)
 									ret = CAN1_Send_Msg(CANSendBuff,CANSendDLC,CANSendID);
 								}	
 							}
+							//回传数据
+							
 							break;
 						case 0xF007:	//CAN报文获取命令
 							//命令响应
@@ -388,13 +392,15 @@ void usart2rec_task(void *p_arg)
 							t_frame[10] = (u8)(t_checksum & 0xFF);	
 							t_frame[11] = t_tail[0];
 							t_frame[12] = t_tail[1];
-							
 							SendFrame();
 							break;					
 						case 0xF003:		//DA输出
+							//命令响应
 							DA_Channel = r_frame[5];
 							DA_Vol = r_frame[6] / 10.0;
 							DAC7565_Output(DA_Channel,DA_Vol);
+							//回传数据
+						
 							break;	
 						case 0xF004:		//开关模块
 							//命令响应
@@ -443,7 +449,7 @@ void usart2rec_task(void *p_arg)
 			}
 			USART_RX_STA = 0;
 		}		
-		OSTimeDlyHMSM(0,0,0,10,OS_OPT_TIME_HMSM_STRICT,&err);
+		OSTimeDlyHMSM(0,0,0,10,OS_OPT_TIME_HMSM_STRICT,&err);	//任务执行周期10ms
 	}
 }
 
