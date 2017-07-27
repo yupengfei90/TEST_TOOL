@@ -277,6 +277,9 @@ void usart2rec_task(void *p_arg)
 	u16 CANRecvID;						//CAN获取报文命令变量
 	u8 CANRecvDLC;		
 	u8 CANRecvBuff[8] = {0};
+//	u32 while_cnt;
+//	u8 IsReportReceiveFail = 0;
+	
 	while(1){
 		if(USART_RX_STA & 0x8000){
 //			printf("\r\n接收到的数据为: \r\n");
@@ -336,11 +339,41 @@ void usart2rec_task(void *p_arg)
 						case 0xF007:	//CAN报文获取命令
 							//命令响应
 							CANRecvID = r_frame[5] << 8 | r_frame[6];	
-							CANRecvDLC = RxMessage.DLC;
-							while(!(RxMessage.StdId == CANRecvID));	//没有获取到想要的ID则一直等待
-							for(i=0;i<CANRecvDLC;i++){
-								CANRecvBuff[i] = RxMessage.Data[i];
+							switch(CANRecvID)
+							{
+								case 0x513:
+									CANRecvDLC = RxMessage_513H.DLC;
+									for(i=0;i<CANRecvDLC;i++){
+										CANRecvBuff[i] = RxMessage_513H.Data[i];
+									}
+									break;
+								case 0x514:
+									break;
+								case 0x530:
+									break;
+								default:
+									break;
 							}
+							
+//							while_cnt = 0;
+//							while(1){
+//								if((RxMessage.StdId == CANRecvID) && (RxMessage.Data[3] > 0)){
+//									break;
+//								}
+//								else{
+//									while_cnt++;	//等待想要的报文，超时则跳出while(1)，防止程序假死
+//									if(while_cnt > 0xFFFFFF){
+//										IsReportReceiveFail = 1;
+//									break;		
+//									}	
+//								}		
+//							}
+//							
+//							if(IsReportReceiveFail){
+//								IsReportReceiveFail = 0;
+//								break;	//跳出本case		
+//							}
+							
 							
 							//回传数据
 							t_frame[0] = t_head[0];

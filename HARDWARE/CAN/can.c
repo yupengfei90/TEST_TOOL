@@ -11,6 +11,7 @@
 		Global Variable
   ==========================================================================*/
 CanRxMsg RxMessage;
+CanRxMsg RxMessage_513H;
 
 //////////////////////////////////////////////////////////////////////////////////	 
 //本程序只供学习使用，未经作者许可，不得用于其它任何用途
@@ -116,7 +117,20 @@ void CAN1_RX0_IRQHandler(void)
 #if SYSTEM_SUPPORT_OS 		//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
 	OSIntEnter();    
 #endif
-    CAN_Receive(CAN1, 0, &RxMessage);
+    CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);
+	switch(RxMessage.StdId)
+	{
+		case 0x513:
+			RxMessage_513H = RxMessage;
+			break;
+		case 0x514:
+			break;
+		case 0x530:
+			break;
+		default:
+			break;	
+	}		
+
 //	for(i=0;i<8;i++)
 //	printf("rxbuf[%d]:%d\r\n",i,RxMessage.Data[i]);
 #if SYSTEM_SUPPORT_OS 	//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
@@ -125,9 +139,10 @@ void CAN1_RX0_IRQHandler(void)
 }
 #endif
 
-//can发送一组数据(固定格式:ID为0X12,标准帧,数据帧)	
+//can发送一组数据
 //len:数据长度(最大为8)				     
 //msg:数据指针,最大为8个字节.
+//id:标识符
 //返回值:0,成功;
 //		 其他,失败;
 u8 CAN1_Send_Msg(u8* msg,u8 len,u16 id)
