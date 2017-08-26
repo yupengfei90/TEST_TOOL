@@ -11,7 +11,6 @@
 		Global Variable
   ==========================================================================*/
 CanRxMsg RxMessage;
-CanRxMsg RxMessage_513H;
 
 //////////////////////////////////////////////////////////////////////////////////	 
 //本程序只供学习使用，未经作者许可，不得用于其它任何用途
@@ -118,21 +117,22 @@ void CAN1_RX0_IRQHandler(void)
 	OSIntEnter();    
 #endif
     CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);
-	switch(RxMessage.StdId)
-	{
-		case 0x513:
-			RxMessage_513H = RxMessage;
-			break;
-		case 0x514:
-			break;
-		case 0x530:
-			break;
-		default:
-			break;	
-	}		
+//	switch(RxMessage.StdId)
+//	{
+//		case 0x513:
+//			RxMessage_513H = RxMessage;
+//			break;
+//		case 0x514:
+//			break;
+//		case 0x530:
+//			break;
+//		default:
+//			break;	
+//	}		
 
+//	printf("\r\nDLC = %d, ",RxMessage.DLC);
 //	for(i=0;i<8;i++)
-//	printf("rxbuf[%d]:%d\r\n",i,RxMessage.Data[i]);
+//	printf("rxbuf[%d]:%d ",i,RxMessage.Data[i]);
 #if SYSTEM_SUPPORT_OS 	//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
 	OSIntExit();  											 
 #endif

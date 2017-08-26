@@ -156,7 +156,7 @@ if (TEAM_PORT == USART2){
 	TIM7_Int_Init(100-1,8400-1);	//10ms中断一次
 	TIM_Cmd(TIM7, DISABLE); //关闭定时器7
 #endif
-	
+	USART_RX_STA=0; 	
 }
 
 
@@ -172,9 +172,11 @@ void MyUSART_SendData(USART_TypeDef* USARTx, uint16_t Data)
 }
 
 
+extern OS_TCB 	USART2RECTask_TCB;
 void USART2_IRQHandler(void)                	//串口2中断服务程序
 {
 	u8 Res;
+	OS_ERR err;
 #if SYSTEM_SUPPORT_OS 		//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
 	OSIntEnter();    
 #endif
@@ -197,6 +199,7 @@ void USART2_IRQHandler(void)                	//串口2中断服务程序
 			}else 
 			{
 				USART_RX_STA|=1<<15;					//强制标记接收完成
+				OSTaskSemPost(&USART2RECTask_TCB,OS_OPT_POST_NONE,&err);
 			} 
 		}   		 
   } 
@@ -208,10 +211,11 @@ void USART2_IRQHandler(void)                	//串口2中断服务程序
 void USART3_IRQHandler(void)                	//串口3中断服务程序
 {
 	u8 Res;
+	OS_ERR err;
 #if SYSTEM_SUPPORT_OS 		//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
 	OSIntEnter();    
 #endif
-	if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)  //接收中断(接收到的数据必须是0x0d 0x0a结尾)
+	if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)  //接收中断
 	{
 		Res =USART_ReceiveData(USART3);//(USART1->DR);	//读取接收到的数据
 		
@@ -230,6 +234,7 @@ void USART3_IRQHandler(void)                	//串口3中断服务程序
 			}else 
 			{
 				USART_RX_STA|=1<<15;					//强制标记接收完成
+				OSTaskSemPost(&USART2RECTask_TCB,OS_OPT_POST_NONE,&err);
 			} 
 		}   		 
   } 

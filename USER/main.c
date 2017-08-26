@@ -223,7 +223,7 @@ void led3_task(void *p_arg)
 }
 
 
-void SendWrongFrame(void)
+static void SendWrongFrame(void)
 {
 	u8 i;
 	
@@ -239,11 +239,11 @@ void SendWrongFrame(void)
 	for(i=0;i<9;++i)
 		MyUSART_SendData(TEAM_PORT,t_frame[i]);
 }
-void SendFrame(void)
+static void SendFrame(void)
 {
 	u8 i;
 	
-	for(i=0;i<t_frame[2]+4;i++){
+	for(i=0;i<32;i++){
 		MyUSART_SendData(TEAM_PORT,t_frame[i]);
 	}
 }
@@ -277,11 +277,12 @@ void usart2rec_task(void *p_arg)
 	u16 CANRecvID;						//CAN获取报文命令变量
 	u8 CANRecvDLC;		
 	u8 CANRecvBuff[8] = {0};
-//	u32 while_cnt;
-//	u8 IsReportReceiveFail = 0;
-	
+	u32 while_cnt;
+	u8 IsReportReceiveFail = 0;
+
 	while(1){
-		if(USART_RX_STA & 0x8000){
+		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
+//		if(USART_RX_STA & 0x8000){
 //			printf("\r\n接收到的数据为: \r\n");
 			len = (USART_RX_STA & 0x7FF);
 //			for(t=0;t<len;t++){
@@ -339,42 +340,45 @@ void usart2rec_task(void *p_arg)
 						case 0xF007:	//CAN报文获取命令
 							//命令响应
 							CANRecvID = r_frame[5] << 8 | r_frame[6];	
-							switch(CANRecvID)
-							{
-								case 0x513:
-									CANRecvDLC = RxMessage_513H.DLC;
-									for(i=0;i<CANRecvDLC;i++){
-										CANRecvBuff[i] = RxMessage_513H.Data[i];
-									}
+//							switch(CANRecvID)
+//							{
+//								case 0x513:
+//									CANRecvDLC = RxMessage_513H.DLC;
+//									for(i=0;i<CANRecvDLC;i++){
+//										CANRecvBuff[i] = RxMessage_513H.Data[i];
+//									}
+//									break;
+//								case 0x514:
+//									break;
+//								case 0x530:
+//									break;
+//								default:
+//									break;
+//							}
+							
+							while_cnt = 0;
+							while(1){
+								if((RxMessage.StdId == CANRecvID) && (RxMessage.Data[1] > 0)){
 									break;
-								case 0x514:
-									break;
-								case 0x530:
-									break;
-								default:
-									break;
+								}
+								else{
+									while_cnt++;	//等待想要的报文，超时则跳出while(1)，防止程序假死
+									if(while_cnt > 0xFFFFFF){
+										IsReportReceiveFail	= 1;
+										break;
+									}	
+								}		
+							}
+//							
+							if(IsReportReceiveFail){
+								IsReportReceiveFail = 0;
+								break;	//跳出本case,不回传数据		
 							}
 							
-//							while_cnt = 0;
-//							while(1){
-//								if((RxMessage.StdId == CANRecvID) && (RxMessage.Data[3] > 0)){
-//									break;
-//								}
-//								else{
-//									while_cnt++;	//等待想要的报文，超时则跳出while(1)，防止程序假死
-//									if(while_cnt > 0xFFFFFF){
-//										IsReportReceiveFail = 1;
-//									break;		
-//									}	
-//								}		
-//							}
-//							
-//							if(IsReportReceiveFail){
-//								IsReportReceiveFail = 0;
-//								break;	//跳出本case		
-//							}
-							
-							
+							CANRecvDLC = RxMessage.DLC;
+							for(i=0;i<CANRecvDLC;i++){
+								CANRecvBuff[i] = RxMessage.Data[i];
+							}
 							//回传数据
 							t_frame[0] = t_head[0];
 							t_frame[1] = t_head[1];
@@ -481,8 +485,8 @@ void usart2rec_task(void *p_arg)
 				}
 			}
 			USART_RX_STA = 0;
-		}		
-		OSTimeDlyHMSM(0,0,0,10,OS_OPT_TIME_HMSM_STRICT,&err);	//任务执行周期10ms
+//		}		
+//		OSTimeDlyHMSM(0,0,0,10,OS_OPT_TIME_HMSM_STRICT,&err);	//任务执行周期10ms
 	}
 }
 
@@ -530,34 +534,34 @@ void key_task(void *p_arg)
 void spi2_task(void *p_arg)
 {
 	OS_ERR err;
-//	u8 i;
+	u8 i;
 	while(1){
 		
 		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
 		//SPI1_ReadWriteByte(0xaa);	//SPI2总线读写两个字节
 		//SPI2_ReadWriteByte(0x55);
-//		for(i=0;i<4;i++)
-//			DAC7565_Output(i,i+1);	
+		for(i=0;i<4;i++)
+			DAC7565_Output(i,i+1);	
 //		range_register_set();
 		
 //		SPI_ReadTest();
 //		AD7328_ChannelRead(0);
 		
-		AD7328_Sample(SIG_Sensor_AD0);
-		printf(" SIG_Sensor_AD0\r\n");
-		AD7328_Sample(SIG_Sensor_AD1);
-		printf(" SIG_Sensor_AD1\r\n");
-		AD7328_Sample(SIG_Sensor_AD2);
-		printf(" SIG_Sensor_AD2\r\n");
-		AD7328_Sample(SIG_Sensor_AD3);
-		printf(" SIG_Sensor_AD3\r\n");
-		AD7328_Sample(SIG_Sensor_AD4);
-		printf(" SIG_Sensor_AD4\r\n");
+//		AD7328_Sample(SIG_Sensor_AD0);
+//		printf(" SIG_Sensor_AD0\r\n");
+//		AD7328_Sample(SIG_Sensor_AD1);
+//		printf(" SIG_Sensor_AD1\r\n");
+//		AD7328_Sample(SIG_Sensor_AD2);
+//		printf(" SIG_Sensor_AD2\r\n");
+//		AD7328_Sample(SIG_Sensor_AD3);
+//		printf(" SIG_Sensor_AD3\r\n");
+//		AD7328_Sample(SIG_Sensor_AD4);
+//		printf(" SIG_Sensor_AD4\r\n");
 
 //		AD7328_Sample(SIG_Trig_Low_AD8);
 //		printf(" SIG_Trig_Low_AD8\r\n");
 
-		printf("\r\n");
+//		printf("\r\n");
 
 //		DAC7565_Output(0,3.6);
 //		SPI2_ReadWriteByte(0x55);

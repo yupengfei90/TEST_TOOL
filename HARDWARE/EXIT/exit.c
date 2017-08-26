@@ -9,13 +9,13 @@ extern OS_TCB SPI2Task_TCB;
 void EXTI0_IRQHandler(void)
 {
 #if SYSTEM_SUPPORT_OS
-	OS_ERR err;
+//	OS_ERR err;
 	OSIntEnter();
 #endif
 	delay_ms(10); //延迟10ms,消抖
 	if(KEY_User == 1){
 		//LED4 = ~LED4;	//LED4的PD12管脚被HCF4051占用，不应再使用，以免引起冲突
-		OSTaskSemPost(&KEYTask_TCB,OS_OPT_POST_NONE,&err);
+//		OSTaskSemPost(&KEYTask_TCB,OS_OPT_POST_NONE,&err);
 //		OSTaskSemPost(&SPI2Task_TCB,OS_OPT_POST_NONE,&err);
 	}
 
@@ -26,6 +26,12 @@ void EXTI0_IRQHandler(void)
 #endif
 }
 
+
+/*============================================================================
+	名称：exit0_init，exit是external interrupt的简写
+	参数：无
+	功能：初始化用户按键并配置相应的外部中断
+  ============================================================================*/
 void exit0_init()
 {
 	EXTI_InitTypeDef EXTI_InitStruct;
@@ -52,3 +58,7 @@ void exit0_init()
 	NVIC_InitStruct.NVIC_IRQChannelSubPriority = 1;
 	NVIC_Init(&NVIC_InitStruct);
 }
+/*
+@ end of exit0_init()
+*/
+

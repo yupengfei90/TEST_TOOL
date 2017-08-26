@@ -19,7 +19,7 @@ void DAC7565_Init(void)
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB,ENABLE); //使能GPIOB的时钟
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE,ENABLE); //使能GPIOE的时钟
 	
-	//74HCT595的RSTSEL,SYNC(-),EN(-)引脚都设置为输出引脚,(-)表示低有效
+	//DAC7565的RSTSEL,SYNC(-),EN(-)引脚都设置为输出引脚,(-)表示低有效
 	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_10|GPIO_Pin_15;
 	GPIO_InitStructure.GPIO_Mode=GPIO_Mode_OUT;//输出
 	GPIO_InitStructure.GPIO_OType=GPIO_OType_PP;  //推挽输出
@@ -61,7 +61,7 @@ void DAC7565_Output(u8 channel, double voltage)
 	//设置输出AD值
 	ad = (u16)((voltage/(2.5*2))*4095);	//因为外部电路做了2倍放大处理，所以这里除2，
 										//2.5v是DAC7565的最大输出电压
-	DAC7565_Seq.data &= (~(0x0FFF<<4));
+	DAC7565_Seq.data &= (~(0xFFF<<4));
 	DAC7565_Seq.data |= (ad<<4);
 	
 	DAC7565_EN = 0;
