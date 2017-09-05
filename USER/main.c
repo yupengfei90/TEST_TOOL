@@ -14,22 +14,6 @@
 #include "malloc.h"
 #include "includes.h"
 
-//ALIENTEK 探索者STM32F407开发板 UCOSIII实验
-//例13-1 UCOSIII 同时等待多个内核对象
-
-//UCOSIII中以下优先级用户程序不能使用，ALIENTEK
-//将这些优先级分配给了UCOSIII的5个系统内部任务
-//优先级0：中断服务服务管理任务 OS_IntQTask()
-//优先级1：时钟节拍任务 OS_TickTask()
-//优先级2：定时任务 OS_TmrTask()
-//优先级OS_CFG_PRIO_MAX-2：统计任务 OS_StatTask()
-//优先级OS_CFG_PRIO_MAX-1：空闲任务 OS_IdleTask()
-//技术支持：www.openedv.com
-//淘宝店铺：http://eboard.taobao.com  
-//广州市星翼电子科技有限公司  
-//作者：正点原子 @ALIENTEK
-
-
 //PC上位机与单片机通信的协议部分
 u8 t_frame[32] = {0};			//单片机可发送的最大帧长
 u8 t_head[] = {0xFF, 0xAA};		//单片机发往PC的帧头
@@ -73,6 +57,13 @@ OS_TCB SPI2Task_TCB;
 CPU_STK SPI2Task_STK[SPI2_STK_SIZE];
 void spi2_task(void *p_arg);
 
+//Uart periodly send task
+#define UartSend_TASK_PRIO 7
+#define UartSend_STK_SIZE 128
+OS_TCB UartSendTask_TCB;
+CPU_STK UartSendTask_STK[UartSend_STK_SIZE];
+void UartSend_task(void *p_arg);
+
 //主函数
 int main(void)
 {
@@ -81,8 +72,8 @@ int main(void)
 
 	delay_init(168);  	//时钟初始化
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//中断分组配置
-//	uart_init(115200);  //串口初始化
-	uart_init(1382400);
+	uart_init(115200);  //串口初始化
+//	uart_init(1382400);
 	LED_Init();         //LED初始化	
 	exit0_init();
 	KEY_Init();
@@ -96,24 +87,6 @@ int main(void)
 	SPI2_SetSpeed(SPI_BaudRatePrescaler_4); //高速模式(42/4)M SPI
 	power_sw_init();
 	HCF4051_Init();
-//	delay_ms(100);		//延时等待各项初始值稳定
-
-#if 0
-	while(1){
-		u16 ad;
-		if(KEY_User){
-//			AD7328_ChannelSelect(3);
-//			HCF4051_ChannelSelect(0);
-			
-			AD7328_Sample(Power_Vol_AD);
-//			delay_ms(10);
-//			AD7328_ChannelSelect(3);
-//			ad = AD7328_ReadAD();
-//			printf("ad = 0x%X\r\n",ad);
-			delay_ms(1000);
-		}
-	}
-#endif
 	
 	OSInit(&err);		    	//初始化UCOSIII
 	OS_CRITICAL_ENTER();	//进入临界区			 
@@ -203,7 +176,21 @@ void start_task(void *p_arg)
 					(void          *)0,
 					(OS_OPT         )OS_OPT_TASK_STK_CHK|OS_OPT_TASK_STK_CLR,
 					(OS_ERR        *)&err);
-					
+	//创建UartSend任务
+	OSTaskCreate (  (OS_TCB        *)&UartSendTask_TCB,
+					(CPU_CHAR      *)"UartSend task",
+					(OS_TASK_PTR    )UartSend_task,
+					(void          *)0,
+					(OS_PRIO        )UartSend_TASK_PRIO,
+					(CPU_STK       *)UartSendTask_STK,
+					(CPU_STK_SIZE   )UartSend_STK_SIZE/10,
+					(CPU_STK_SIZE   )UartSend_STK_SIZE,
+					(OS_MSG_QTY     )0,
+					(OS_TICK        )0,
+					(void          *)0,
+					(OS_OPT         )OS_OPT_TASK_STK_CHK|OS_OPT_TASK_STK_CLR,
+					(OS_ERR        *)&err);
+									
 	OS_CRITICAL_EXIT();	//退出临界区	 
 	OSTaskDel((OS_TCB *)0, &err);
 }
@@ -282,14 +269,9 @@ void usart2rec_task(void *p_arg)
 
 	while(1){
 		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
-//		if(USART_RX_STA & 0x8000){
-//			printf("\r\n接收到的数据为: \r\n");
+
 			len = (USART_RX_STA & 0x7FF);
-//			for(t=0;t<len;t++){
-//				printf("%X ",USART_RX_BUF[t]);
-//			}
-//			printf("\r\n");
-			
+		
 			for(t=0;t<len;t++){
 				r_frame[t] = USART_RX_BUF[t];
 			}
@@ -308,8 +290,6 @@ void usart2rec_task(void *p_arg)
 				}
 				r_checksum = (r_frame[r_len] << 8) | r_frame[r_len+1];
 				if(checksum != r_checksum){	
-//					printf("校验和错误，请重发\r\n");
-//					printf("checksum = %d,r_checksum = %d\r\n",checksum,r_checksum);
 					checksum = 0;
 					SendWrongFrame();					
 				} 
@@ -340,21 +320,6 @@ void usart2rec_task(void *p_arg)
 						case 0xF007:	//CAN报文获取命令
 							//命令响应
 							CANRecvID = r_frame[5] << 8 | r_frame[6];	
-//							switch(CANRecvID)
-//							{
-//								case 0x513:
-//									CANRecvDLC = RxMessage_513H.DLC;
-//									for(i=0;i<CANRecvDLC;i++){
-//										CANRecvBuff[i] = RxMessage_513H.Data[i];
-//									}
-//									break;
-//								case 0x514:
-//									break;
-//								case 0x530:
-//									break;
-//								default:
-//									break;
-//							}
 							
 							while_cnt = 0;
 							while(1){
@@ -485,8 +450,6 @@ void usart2rec_task(void *p_arg)
 				}
 			}
 			USART_RX_STA = 0;
-//		}		
-//		OSTimeDlyHMSM(0,0,0,10,OS_OPT_TIME_HMSM_STRICT,&err);	//任务执行周期10ms
 	}
 }
 
@@ -570,4 +533,16 @@ void spi2_task(void *p_arg)
 	}
 }
 
-
+//UartSend 发送周期100ms
+void UartSend_task(void *p_arg)
+{
+	OS_ERR err;
+	u8 i;
+	u8 data[32] = {0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,0x50,0x51};
+	while(1){
+		for(i=0;i<32;i++){
+			MyUSART_SendData(TEAM_PORT,data[i]);
+		}
+		OSTimeDlyHMSM(0,0,0,100,OS_OPT_TIME_HMSM_STRICT,&err);
+	}
+}

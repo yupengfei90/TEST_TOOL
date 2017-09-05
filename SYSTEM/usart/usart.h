@@ -26,7 +26,7 @@
 //3,增加了USART_REC_LEN,用于定义串口最大允许接收的字节数(不大于2的14次方)
 //4,修改了EN_USART1_RX的使能方式
 ////////////////////////////////////////////////////////////////////////////////// 
-#define TEAM_PORT USART2	//定义要使用哪个串口,USART2,USART3可供选择,USART1被占用
+#define TEAM_PORT USART3	//定义要使用哪个串口,USART2,USART3可供选择,USART1被占用
 
 #define USART_REC_LEN  			200  	//定义最大接收字节数 200
 #define EN_USARTx_RX_IT 			1		//使能（1）/禁止（0）串口接收中断
