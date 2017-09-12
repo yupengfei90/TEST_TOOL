@@ -11,7 +11,7 @@
 		Global Variable
   ==========================================================================*/
 CanRxMsg RxMessage;
-
+CanRxMsg RxMessage_0x513;
 //////////////////////////////////////////////////////////////////////////////////	 
 //本程序只供学习使用，未经作者许可，不得用于其它任何用途
 //ALIENTEK STM32F407开发板
@@ -117,18 +117,18 @@ void CAN1_RX0_IRQHandler(void)
 	OSIntEnter();    
 #endif
     CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);
-//	switch(RxMessage.StdId)
-//	{
-//		case 0x513:
-//			RxMessage_513H = RxMessage;
-//			break;
-//		case 0x514:
-//			break;
-//		case 0x530:
-//			break;
-//		default:
-//			break;	
-//	}		
+	switch(RxMessage.StdId)
+	{
+		case 0x513:
+			RxMessage_0x513 = RxMessage;
+			break;
+		case 0x514:
+			break;
+		case 0x530:
+			break;
+		default:
+			break;	
+	}		
 
 //	printf("\r\nDLC = %d, ",RxMessage.DLC);
 //	for(i=0;i<8;i++)

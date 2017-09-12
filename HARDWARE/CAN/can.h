@@ -26,7 +26,7 @@ u8 CAN1_Receive_Msg(u16 id, u8 *data);						//接收数据
 //全局变量
 #ifndef _CAN_C
  extern CanRxMsg RxMessage;
- extern CanRxMsg RxMessage_513H;
+ extern CanRxMsg RxMessage_0x513;
 #endif 
 #endif
 

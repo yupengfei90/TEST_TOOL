@@ -15,13 +15,15 @@
 #include "includes.h"
 
 //PC上位机与单片机通信的协议部分
-u8 t_frame[32] = {0};			//单片机可发送的最大帧长
+u8 t_frame[40] = {0};			//单片机可发送的最大帧长
 u8 t_head[] = {0xFF, 0xAA};		//单片机发往PC的帧头
 u8 t_tail[] = {0xFF, 0x55};		//单片机发往PC的帧尾
 u8 r_frame[32] = {0};			
 u8 r_head[] = {0xFF,0x55};		//PC发往下位机的固定帧头
 u8 r_tail[] = {0xFF,0xAA};		//PC发往下位机的固定帧尾
-
+u8 CheckedProductNo =1;
+u8 msgType = 1;
+u8 IsStartSetComplete = 0;
 //Start task 
 #define START_TASK_PRIO 3
 #define START_STK_SIZE 128
@@ -58,7 +60,7 @@ CPU_STK SPI2Task_STK[SPI2_STK_SIZE];
 void spi2_task(void *p_arg);
 
 //Uart periodly send task
-#define UartSend_TASK_PRIO 7
+#define UartSend_TASK_PRIO 8
 #define UartSend_STK_SIZE 128
 OS_TCB UartSendTask_TCB;
 CPU_STK UartSendTask_STK[UartSend_STK_SIZE];
@@ -72,8 +74,8 @@ int main(void)
 
 	delay_init(168);  	//时钟初始化
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//中断分组配置
-	uart_init(115200);  //串口初始化
-//	uart_init(1382400);
+//	uart_init(115200);  //串口初始化
+	uart_init(1382400);
 	LED_Init();         //LED初始化	
 	exit0_init();
 	KEY_Init();
@@ -84,7 +86,7 @@ int main(void)
 	DAC7565_Init();
 	AD7328_Init();
 	SPI2_Init();
-	SPI2_SetSpeed(SPI_BaudRatePrescaler_4); //高速模式(42/4)M SPI
+	SPI2_SetSpeed(SPI_BaudRatePrescaler_8); //高速模式(42/8)M SPI
 	power_sw_init();
 	HCF4051_Init();
 	
@@ -230,12 +232,13 @@ static void SendFrame(void)
 {
 	u8 i;
 	
-	for(i=0;i<32;i++){
+	for(i=0;i<40;i++){
 		MyUSART_SendData(TEAM_PORT,t_frame[i]);
 	}
 }
 
 
+#if 0
 //USART2接收处理任务
 void usart2rec_task(void *p_arg)
 {
@@ -452,7 +455,72 @@ void usart2rec_task(void *p_arg)
 			USART_RX_STA = 0;
 	}
 }
+#endif
 
+//连续发送的UART接收任务
+void usart2rec_task(void *p_arg)
+{
+	OS_ERR err;
+		u16 checksum = 0; 	//校验和
+	u16 r_checksum = 0; 	//命令帧中包含的校验和
+	u16 t_checksum = 0;
+//	u32 OverTimeCnt = 0;	
+	u8 i;
+	u16 t,len;
+//	u16 t_len; 		//单片机发往PC上位机的命令帧长度
+	u16 r_len;		//从上位机接收到的命令帧的长度
+	u8 type_h,type_l;
+	u16 type;
+	u8 select_h,select_l;
+	u16 select;
+	while(1){
+		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
+
+		len = (USART_RX_STA & 0x7FF);
+	
+		for(t=0;t<len;t++){
+			r_frame[t] = USART_RX_BUF[t];
+		}	
+		r_len = r_frame[2];	
+		if (r_frame[0] == r_head[0] && r_frame[1] == r_head[1] &&  \
+			r_frame[2+r_len] == r_tail[0] && r_frame[3+r_len] == r_tail[1])
+		{
+			//				printf("正确的命令格式\r\n");
+				checksum = 0;
+				for(i=2;i<r_len;++i)
+				{	
+					checksum += r_frame[i];
+				}
+				r_checksum = (r_frame[r_len] << 8) | r_frame[r_len+1];
+				if(checksum != r_checksum){	
+					checksum = 0;
+					SendWrongFrame();					
+				} 
+				else{
+//					printf("校验和正确\r\n");	
+					type_h = r_frame[3];
+					type_l = r_frame[4];
+					type = (type_h << 8)| type_l; 
+					switch(type){
+					case 0xF006:		//下位机版本查询命令
+						msgType = 2;
+						break;
+					case 0xF005:		//设置待检零件号
+						CheckedProductNo = r_frame[5];
+						msgType = 1;
+					case 0xF001:
+						msgType = 1;
+						
+						break;
+					}
+				}	
+		} 
+		else
+		{
+			SendWrongFrame();	//不正确的数据帧
+		}
+	}
+}
 
 //用户按键按下响应任务处理任务
 void key_task(void *p_arg)
@@ -498,6 +566,7 @@ void spi2_task(void *p_arg)
 {
 	OS_ERR err;
 	u8 i;
+
 	while(1){
 		
 		OSTaskSemPend(0,OS_OPT_PEND_BLOCKING,0,&err);
@@ -538,11 +607,84 @@ void UartSend_task(void *p_arg)
 {
 	OS_ERR err;
 	u8 i;
-	u8 data[32] = {0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,0x50,0x51};
+	u16 powerAD,KL15AD,KL30AD,powerCurAD;
+	u16 locationStepAD1,locationDCMotorAD0,blowerFBAD,locationDCMotorAD1;
+	u16 checkSum;
 	while(1){
-		for(i=0;i<32;i++){
-			MyUSART_SendData(TEAM_PORT,data[i]);
+		switch(CheckedProductNo)
+		{
+			case 1:	//C40D
+				switch(msgType)
+				{
+					case 1: //Normal Message
+						powerAD = AD7328_Sample(Power_Vol_AD);	
+						KL15AD = AD7328_Sample(KL15_Vol_AD);
+						KL30AD = AD7328_Sample(KL30_Vol_AD);
+						locationStepAD1 = AD7328_Sample(Location_Step_AD1);
+						locationDCMotorAD0 = AD7328_Sample(Location_DC_motor_AD0);
+						locationDCMotorAD1 = AD7328_Sample(Location_DC_motor_AD1);
+						blowerFBAD = AD7328_Sample(Blower_FB_AD); 
+						powerCurAD = AD7328_Sample(POWER_Cur_AD);
+						t_frame[0] = 0xFF;
+						t_frame[1] = 0xAA;
+						t_frame[2] = 35;
+						t_frame[3] = 0xF0;
+						t_frame[4] = 0x01;
+						t_frame[5] = (u8)(powerAD>>8);
+						t_frame[6] = (u8)(powerAD&0xFF);
+						t_frame[7] = (u8)(KL15AD>>8);
+						t_frame[8] = (u8)(KL15AD&0xFF);
+						t_frame[9] = (u8)(KL30AD>>8);
+						t_frame[10] = (u8)(KL30AD&0xFF);
+						t_frame[11] = (u8)(locationStepAD1>>8);
+						t_frame[12] = (u8)(locationStepAD1&0xFF);
+						t_frame[13] = (u8)(locationDCMotorAD0>>8);
+						t_frame[14] = (u8)(locationDCMotorAD0&0xFF);
+						t_frame[15] = (u8)(locationDCMotorAD1>>8);
+						t_frame[16] = (u8)(locationDCMotorAD1&0xFF);
+						t_frame[17] = (u8)(blowerFBAD>>8);
+						t_frame[18] = (u8)(blowerFBAD&0xFF);
+						t_frame[19] = (u8)(powerCurAD>>8);
+						t_frame[20] = (u8)(powerCurAD&0xFF);
+						for(i=0;i<6;i++){
+							t_frame[21+i] = 0;	//reserved
+						}
+						for(i=0;i<8;i++){
+							t_frame[27+i] = RxMessage_0x513.Data[i];
+						}
+						checkSum = 0;
+						for(i=0;i<t_frame[2];i++){
+							checkSum += t_frame[2+i];
+						}
+						t_frame[35] = (u8)(checkSum >> 8);
+						t_frame[36] = (u8)(checkSum & 0xFF);
+						t_frame[37] = 0xFF;
+						t_frame[38] = 0x55;
+						SendFrame();
+						OSTimeDlyHMSM(0,0,0,10,OS_OPT_TIME_HMSM_STRICT,&err);					
+						break;
+					case 2:	//工装版本号回应
+						//回传数据
+						t_frame[0] = t_head[0];
+						t_frame[1] = t_head[1];
+						t_frame[2] = 0x07;
+						t_frame[3] = 0xF0;
+						t_frame[4] = 0x06;
+						t_frame[5] = 0xC4;
+						t_frame[6] = 0x0D;
+						t_frame[7] = 0x01;
+						t_frame[8] = 0xCE;
+						t_frame[9] = t_tail[0];
+						t_frame[10] = t_tail[1];
+						SendFrame();
+						OSTimeDlyHMSM(0,0,0,100,OS_OPT_TIME_HMSM_STRICT,&err);
+						break;
+				}
+				break;
+			default:
+				break;
 		}
-		OSTimeDlyHMSM(0,0,0,100,OS_OPT_TIME_HMSM_STRICT,&err);
+	
+					
 	}
 }
