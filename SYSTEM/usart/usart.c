@@ -155,8 +155,8 @@ if (TEAM_PORT == USART2){
 }	 	
 	TIM7_Int_Init(100-1,8400-1);	//10ms中断一次
 	TIM_Cmd(TIM7, DISABLE); //关闭定时器7
-#endif
 	USART_RX_STA=0; 	
+#endif
 }
 
 
@@ -237,7 +237,7 @@ void USART3_IRQHandler(void)                	//串口3中断服务程序
 				OSTaskSemPost(&USART2RECTask_TCB,OS_OPT_POST_NONE,&err);
 			} 
 		}   		 
-  } 
+	} 
 #if SYSTEM_SUPPORT_OS 	//如果SYSTEM_SUPPORT_OS为真，则需要支持OS.
 	OSIntExit();  											 
 #endif
